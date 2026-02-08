@@ -1,0 +1,3 @@
+# Ignore Convex backend (deployed separately)
+convex/
+CONVEX_SETUP.md
