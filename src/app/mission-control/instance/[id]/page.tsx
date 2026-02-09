@@ -117,11 +117,32 @@ export default function InstanceDetail({ params }: { params: Promise<{ id: strin
           }`}>
             {metrics.status}
           </span>
-          <button className="px-4 py-2 rounded-xl bg-slate-800 text-white hover:bg-slate-700 transition-colors">
+          <button
+            onClick={async () => {
+              if (!confirm('Restart this instance?')) return;
+              try {
+                const res = await fetch(`/api/instances/${resolvedParams.id}/restart`, { method: 'POST' });
+                const data = await res.json();
+                alert(data.success ? 'Restarting...' : `Error: ${data.error}`);
+              } catch { alert('Failed to restart'); }
+            }}
+            className="px-4 py-2 rounded-xl bg-slate-800 text-white hover:bg-slate-700 transition-colors"
+          >
             Restart
           </button>
-          <button className="px-4 py-2 rounded-xl bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 transition-colors">
-            Stop
+          <button
+            onClick={async () => {
+              if (!confirm('Delete this instance permanently?')) return;
+              try {
+                const res = await fetch(`/api/instances/${resolvedParams.id}`, { method: 'DELETE' });
+                const data = await res.json();
+                if (data.success) window.location.href = '/mission-control';
+                else alert(`Error: ${data.error}`);
+              } catch { alert('Failed to delete'); }
+            }}
+            className="px-4 py-2 rounded-xl bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 transition-colors"
+          >
+            Delete
           </button>
         </div>
       </header>

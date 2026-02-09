@@ -1,12 +1,18 @@
 import { NextResponse } from 'next/server';
 import { saveInstanceMapping } from '@/lib/instance-registry';
 
-// Hardcoded for testing - will move back to env vars after verification
-const SLACK_CLIENT_ID = '10234583137829.10459875597907';
-const SLACK_CLIENT_SECRET = 'ab799eb1e821afc23d3e5865bf052665';
+const SLACK_CLIENT_ID = process.env.SLACK_CLIENT_ID;
+const SLACK_CLIENT_SECRET = process.env.SLACK_CLIENT_SECRET;
 const DOMAIN_SUFFIX = 'ds.jgiebz.com';
 
 export async function GET(request: Request) {
+  if (!SLACK_CLIENT_ID || !SLACK_CLIENT_SECRET) {
+    console.error('Slack OAuth credentials not configured');
+    return NextResponse.redirect(
+      new URL('/setup/slack?error=server_configuration', request.url)
+    );
+  }
+
   const { searchParams } = new URL(request.url);
   const code = searchParams.get('code');
   const state = searchParams.get('state');
@@ -132,7 +138,11 @@ async function configureInstanceSlack(
   if (!domain) return false;
 
   const configServiceUrl = 'https://dsconfig.jgiebz.com/configure-slack';
-  const configApiSecret = process.env.CONFIG_API_SECRET || 'ds-config-secret-2026';
+  const configApiSecret = process.env.CONFIG_API_SECRET;
+  if (!configApiSecret) {
+    console.error('CONFIG_API_SECRET not configured');
+    return false;
+  }
   
   try {
     console.log(`Configuring Slack on ${domain} via config service...`);

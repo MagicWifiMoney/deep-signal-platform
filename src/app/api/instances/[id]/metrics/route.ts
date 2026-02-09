@@ -1,14 +1,18 @@
 import { NextResponse } from 'next/server';
 
-const HETZNER_API_TOKEN = process.env.HETZNER_API_TOKEN || 'IMdbtCuR5QiGXfKtN4CHeK7fStB5keFhinbxDqOUkLHnFvaUGNSYNMc9pd5oKUuF';
+const HETZNER_API_TOKEN = process.env.HETZNER_API_TOKEN;
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  if (!HETZNER_API_TOKEN) {
+    return NextResponse.json({ error: 'Hetzner API not configured' }, { status: 500 });
+  }
+
   try {
     const { id } = await params;
-    
+
     // Get server details from Hetzner
     const serverRes = await fetch(`https://api.hetzner.cloud/v1/servers/${id}`, {
       headers: { 'Authorization': `Bearer ${HETZNER_API_TOKEN}` },
@@ -61,40 +65,54 @@ export async function GET(
         hours: uptimeHours,
         days: uptimeDays,
         since: createdAt.toISOString(),
-        percentage: 99.97, // Mock for now
       },
-      
-      metrics: metrics ? {
-        cpu: {
-          current: metrics.timeseries?.cpu?.[0]?.values?.slice(-1)?.[0]?.[1] || Math.random() * 30,
-          avg: 15 + Math.random() * 10,
-          peak: 45 + Math.random() * 20,
-        },
-        memory: {
-          used: 1.2 + Math.random() * 0.5,
-          total: server.server_type.memory,
-          percentage: (1.2 + Math.random() * 0.5) / server.server_type.memory * 100,
-        },
-        disk: {
-          used: 5 + Math.random() * 3,
-          total: server.server_type.disk,
-          percentage: (5 + Math.random() * 3) / server.server_type.disk * 100,
-        },
-        network: {
-          inbound: Math.floor(Math.random() * 100),
-          outbound: Math.floor(Math.random() * 50),
-        },
-      } : null,
-      
+
+      metrics: metrics ? (() => {
+        // Parse real CPU data from Hetzner timeseries
+        const cpuTimeseries = metrics.timeseries?.cpu;
+        const cpuValues = cpuTimeseries?.[0]?.values || [];
+        const cpuNumbers = cpuValues.map((v: [number, string]) => parseFloat(v[1])).filter((n: number) => !isNaN(n));
+        const cpuCurrent = cpuNumbers.length > 0 ? cpuNumbers[cpuNumbers.length - 1] : null;
+        const cpuAvg = cpuNumbers.length > 0 ? cpuNumbers.reduce((a: number, b: number) => a + b, 0) / cpuNumbers.length : null;
+        const cpuPeak = cpuNumbers.length > 0 ? Math.max(...cpuNumbers) : null;
+
+        // Parse network data
+        const netIn = metrics.timeseries?.network?.find((t: any) => t.name?.includes('in'));
+        const netOut = metrics.timeseries?.network?.find((t: any) => t.name?.includes('out'));
+        const netInValues = netIn?.values || [];
+        const netOutValues = netOut?.values || [];
+        const lastNetIn = netInValues.length > 0 ? parseFloat(netInValues[netInValues.length - 1][1]) : null;
+        const lastNetOut = netOutValues.length > 0 ? parseFloat(netOutValues[netOutValues.length - 1][1]) : null;
+
+        return {
+          cpu: {
+            current: cpuCurrent != null ? Math.round(cpuCurrent * 100) / 100 : null,
+            avg: cpuAvg != null ? Math.round(cpuAvg * 100) / 100 : null,
+            peak: cpuPeak != null ? Math.round(cpuPeak * 100) / 100 : null,
+          },
+          memory: {
+            total: server.server_type.memory,
+            // Note: Hetzner API doesn't provide memory usage — requires node_exporter or SSH
+            used: null,
+            percentage: null,
+          },
+          disk: {
+            total: server.server_type.disk,
+            // Note: Hetzner API doesn't provide disk usage — requires node_exporter or SSH
+            used: null,
+            percentage: null,
+          },
+          network: {
+            inbound: lastNetIn != null ? Math.round(lastNetIn) : null,
+            outbound: lastNetOut != null ? Math.round(lastNetOut) : null,
+          },
+        };
+      })() : null,
+
       health: {
-        status: 'healthy',
+        status: server.status === 'running' ? 'unknown' : 'offline',
         lastCheck: new Date().toISOString(),
-        checks: {
-          openclaw: 'running',
-          tailscale: 'connected',
-          disk: 'ok',
-          memory: 'ok',
-        },
+        note: 'Health checks require SSH or agent endpoint — not yet implemented',
       },
     });
   } catch (error) {

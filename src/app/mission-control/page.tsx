@@ -2,31 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-
-interface Instance {
-  id: number;
-  name: string;
-  hostname: string;
-  publicIp: string;
-  tailscaleIp: string;
-  status: 'online' | 'warning' | 'offline';
-  serverType: string;
-  datacenter: string;
-  created: string;
-  metrics?: {
-    cpu: number;
-    memory: number;
-    disk: number;
-  };
-  openclaw?: {
-    version: string;
-    model: string;
-    messagesTotal: number;
-    messagesToday: number;
-    uptime: number;
-    lastSeen: string;
-  };
-}
+import type { Instance } from '@/lib/api';
 
 const AGENT_OPS = [
   { id: 'orchestrator', name: 'Orchestrator', status: 'active', lastAction: 'Dispatched SecurityBot to scan', time: '2m ago', icon: '🎯' },
@@ -164,6 +140,7 @@ export default function MissionControl() {
             onClick={fetchInstances}
             className="p-2 rounded-xl bg-slate-800/50 hover:bg-slate-700 transition-colors"
             title="Refresh"
+            aria-label="Refresh instances"
           >
             <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -210,7 +187,7 @@ export default function MissionControl() {
           {activeView === 'fleet' && !isLoading && (
             <div className="space-y-6">
               {/* Stats Bar */}
-              <div className="grid grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {[
                   { label: 'Total Instances', value: instances.length, icon: '🖥️', color: 'cyan' },
                   { label: 'Messages Today', value: totalMessages.toLocaleString(), icon: '💬', color: 'blue' },
@@ -230,9 +207,13 @@ export default function MissionControl() {
               {/* Instances Grid */}
               <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
                 {instances.map((instance) => (
-                  <div 
+                  <div
                     key={instance.id}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Instance ${instance.name}, status: ${instance.status}`}
                     onClick={() => setSelectedInstance(instance)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedInstance(instance); } }}
                     className={`glass rounded-2xl p-6 cursor-pointer transition-all hover:border-cyan-500/50 ${
                       selectedInstance?.id === instance.id ? 'border-cyan-500 bg-cyan-500/5' : ''
                     }`}
@@ -507,16 +488,17 @@ export default function MissionControl() {
           <aside className="w-80 border-l border-slate-800 bg-slate-900/50 p-6">
             <div className="flex items-center justify-between mb-6">
               <h3 className="font-semibold text-white">Instance Details</h3>
-              <button 
+              <button
                 onClick={() => setSelectedInstance(null)}
                 className="p-1 rounded-lg hover:bg-slate-800 transition-colors"
+                aria-label="Close instance details"
               >
                 <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
-            
+
             <div className="space-y-6">
               {/* Status */}
               <div className="flex items-center gap-3">
@@ -566,13 +548,35 @@ export default function MissionControl() {
                 >
                   Open Dashboard
                 </a>
-                <button className="w-full px-4 py-2 rounded-xl bg-slate-800 text-white hover:bg-slate-700 transition-colors text-sm">
-                  SSH Console
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(`ssh -i ~/.ssh/hetzner_deepsignal root@${selectedInstance.publicIp}`);
+                    alert('SSH command copied to clipboard');
+                  }}
+                  className="w-full px-4 py-2 rounded-xl bg-slate-800 text-white hover:bg-slate-700 transition-colors text-sm"
+                  aria-label={`Copy SSH command for ${selectedInstance.name}`}
+                >
+                  Copy SSH Command
                 </button>
-                <button className="w-full px-4 py-2 rounded-xl bg-slate-800 text-white hover:bg-slate-700 transition-colors text-sm">
+                <Link
+                  href={`/mission-control/instance/${selectedInstance.id}?tab=logs`}
+                  className="w-full px-4 py-2 rounded-xl bg-slate-800 text-white hover:bg-slate-700 transition-colors text-sm text-center block"
+                  aria-label={`View logs for ${selectedInstance.name}`}
+                >
                   View Logs
-                </button>
-                <button className="w-full px-4 py-2 rounded-xl border border-amber-500/50 text-amber-400 hover:bg-amber-500/10 transition-colors text-sm">
+                </Link>
+                <button
+                  onClick={async () => {
+                    if (!confirm(`Restart instance ${selectedInstance.name}?`)) return;
+                    try {
+                      const res = await fetch(`/api/instances/${selectedInstance.id}/restart`, { method: 'POST' });
+                      const data = await res.json();
+                      alert(data.success ? 'Instance restarting...' : `Error: ${data.error}`);
+                    } catch (e) { alert('Failed to restart instance'); }
+                  }}
+                  className="w-full px-4 py-2 rounded-xl border border-amber-500/50 text-amber-400 hover:bg-amber-500/10 transition-colors text-sm"
+                  aria-label={`Restart instance ${selectedInstance.name}`}
+                >
                   Restart Instance
                 </button>
               </div>
@@ -587,9 +591,10 @@ export default function MissionControl() {
           <div className="glass rounded-2xl p-8 max-w-lg w-full">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-white">Deploy New Instance</h2>
-              <button 
+              <button
                 onClick={() => setShowDeployModal(false)}
                 className="p-2 rounded-lg hover:bg-slate-800 transition-colors"
+                aria-label="Close deploy modal"
               >
                 <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

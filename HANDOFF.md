@@ -30,10 +30,10 @@
 ### Slack App (api.slack.com/apps)
 ```
 App ID: A0ADHRRHKSP
-Client ID: 10234583137829.10459875597907
-Client Secret: ab799eb1e821afc23d3e5865bf052665
-Signing Secret: 9732b3681b946a54a59aaafa67cd4ae9
-App Token: "SLACK_APP_TOKEN"
+Client ID: <your-slack-client-id>
+Client Secret: <your-slack-client-secret>
+Signing Secret: <your-slack-signing-secret>
+App Token: <your-slack-app-token>
 Socket Mode: ENABLED
 ```
 
@@ -41,8 +41,8 @@ Socket Mode: ENABLED
 ```
 Domain: jgtest3.ds.jgiebz.com
 IP: 5.161.108.14
-Gateway Token: ds-mldnde13
-Bot Token: "SLACK_BOT_TOKEN"
+Gateway Token: <generated-at-deploy>
+Bot Token: <per-workspace-from-oauth>
 Status: OpenClaw running, Slack socket mode connected
 ```
 
@@ -61,7 +61,7 @@ Status: OpenClaw running, Slack socket mode connected
     "bind": "lan",
     "port": 3000,
     "auth": {
-      "token": "ds-mldnde13"
+      "token": "<generated-at-deploy>"
     }
   },
   "commands": {
@@ -70,8 +70,8 @@ Status: OpenClaw running, Slack socket mode connected
   "channels": {
     "slack": {
       "enabled": true,
-      "appToken": ""SLACK_APP_TOKEN"",
-      "botToken": ""SLACK_BOT_TOKEN""
+      "appToken": "<your-slack-app-token>",
+      "botToken": "<per-workspace-bot-token>"
     }
   }
 }
@@ -289,8 +289,8 @@ OpenClaw supports fine-grained control over who can interact with the bot.
   "channels": {
     "slack": {
       "enabled": true,
-      "appToken": ""SLACK_APP_TOKEN"",
-      "botToken": ""SLACK_BOT_TOKEN"",
+      "appToken": "<your-slack-app-token>",
+      "botToken": "<per-workspace-bot-token>",
       "groupPolicy": "allowlist",
       "dm": {
         "enabled": true,
@@ -408,14 +408,14 @@ journalctl -u openclaw -f
     "bind": "lan",
     "port": 3000,
     "auth": {
-      "token": "ds-mldnde13"
+      "token": "<generated-at-deploy>"
     }
   },
   "channels": {
     "slack": {
       "enabled": true,
-      "appToken": ""SLACK_APP_TOKEN"",
-      "botToken": ""SLACK_BOT_TOKEN"",
+      "appToken": "<your-slack-app-token>",
+      "botToken": "<per-workspace-bot-token>",
       "dm": {
         "enabled": true,
         "policy": "open",

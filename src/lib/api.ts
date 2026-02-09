@@ -12,8 +12,8 @@ export interface Instance {
   created: string;
   metrics?: {
     cpu: number;
-    memory: number;
-    disk: number;
+    memory: number | null;
+    disk: number | null;
   };
   openclaw?: {
     version: string;
