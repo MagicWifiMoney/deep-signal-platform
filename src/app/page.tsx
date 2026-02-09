@@ -106,7 +106,7 @@ export default function Home() {
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-cyan-500/20 rounded-full blur-3xl animate-pulse" />
         <div className="absolute top-1/2 -left-40 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
-        <div className="absolute -bottom-40 right-1/3 w-72 h-72 bg-purple-500/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }} />
+        <div className="absolute -bottom-40 right-1/3 w-72 h-72 bg-cyan-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }} />
       </div>
 
       {/* ─── Progress dots (desktop only) ─── */}
@@ -181,19 +181,6 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Stats row */}
-        <div className={`grid grid-cols-1 sm:grid-cols-3 gap-8 mt-20 transition-all duration-1000 delay-300 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
-          {[
-            { value: '$10', label: 'per month / instance' },
-            { value: '5 min', label: 'deployment time' },
-            { value: '99.9%', label: 'uptime SLA' },
-          ].map((s, i) => (
-            <div key={i} className="text-center">
-              <div className="text-4xl font-bold text-white mb-2">{s.value}</div>
-              <div className="text-slate-500">{s.label}</div>
-            </div>
-          ))}
-        </div>
       </section>
 
       {/* ════════════════════════════════════════════════

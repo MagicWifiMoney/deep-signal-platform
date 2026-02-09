@@ -25,7 +25,7 @@
   /* Deep Signal Brand */
   --ds-cyan: 187 100% 50%;
   --ds-blue: 217 91% 60%;
-  --ds-purple: 263 70% 50%;
+  --ds-deep-blue: 220 90% 45%;
   --ds-emerald: 160 84% 39%;
 }
 
@@ -48,7 +48,7 @@ body {
 
 /* Gradient text */
 .gradient-text {
-  background: linear-gradient(135deg, hsl(var(--ds-cyan)), hsl(var(--ds-blue)), hsl(var(--ds-purple)));
+  background: linear-gradient(135deg, hsl(var(--ds-cyan)), hsl(var(--ds-blue)), hsl(var(--ds-deep-blue)));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
