@@ -1,8 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { getSettings, saveSettings, getOnboardingState } from '@/lib/store';
+// import { UserButton } from '@clerk/nextjs';
+import { getSettings, saveSettings } from '@/lib/store';
+
+interface Message {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: Date;
+}
 
 interface Stats {
   messagesTotal: number;
@@ -13,87 +21,127 @@ interface Stats {
   tokenLimit: number;
   status: 'online' | 'warning' | 'offline';
   uptime: number;
+  totalInstances: number;
+  totalMonthlyCost: number;
+  onlineInstances: number;
 }
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('overview');
   const [settings, setSettings] = useState(getSettings());
-  const [deployment, setDeployment] = useState<{ domain: string; status: string } | null>(null);
-  const [iframeLoaded, setIframeLoaded] = useState(false);
-  const [iframeError, setIframeError] = useState(false);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [inputMessage, setInputMessage] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   
   const [stats, setStats] = useState<Stats>({
-    messagesTotal: 1247,
-    messagesToday: 89,
-    avgResponseTime: 1.2,
-    satisfaction: 94,
-    tokensUsed: 2.4,
+    messagesTotal: 0,
+    messagesToday: 0,
+    avgResponseTime: 0,
+    satisfaction: 0,
+    tokensUsed: 0,
     tokenLimit: 10,
-    status: 'online',
-    uptime: 99.97,
+    status: 'offline',
+    uptime: 0,
+    totalInstances: 0,
+    totalMonthlyCost: 0,
+    onlineInstances: 0,
   });
 
-  // Load settings and deployment state on mount
+  // Fetch real stats from APIs
   useEffect(() => {
-    setSettings(getSettings());
-    const state = getOnboardingState();
-    if (state.deployment?.domain) {
-      setDeployment({ domain: state.deployment.domain, status: state.deployment.status });
-    }
-  }, []);
-
-  // Simulate real-time stats updates
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setStats(prev => ({
-        ...prev,
-        messagesToday: prev.messagesToday + Math.floor(Math.random() * 2),
-        avgResponseTime: +(1 + Math.random() * 0.5).toFixed(1),
-      }));
-    }, 10000);
+    const fetchRealStats = async () => {
+      try {
+        // Fetch instances
+        const instancesRes = await fetch('/api/instances');
+        const instancesData = await instancesRes.json();
+        const instances = instancesData.instances || [];
+        
+        // Fetch billing
+        const billingRes = await fetch('/api/billing');
+        const billingData = await billingRes.json();
+        
+        // Calculate real stats
+        const totalMessages = instances.reduce((sum: number, i: any) => sum + (i.openclaw?.messagesToday || 0), 0);
+        const totalMessagesTotal = instances.reduce((sum: number, i: any) => sum + (i.openclaw?.messagesTotal || 0), 0);
+        const onlineCount = instances.filter((i: any) => i.status === 'online').length;
+        const avgUptime = instances.length > 0 
+          ? instances.reduce((sum: number, i: any) => sum + (i.openclaw?.uptime || 0), 0) / instances.length
+          : 0;
+        
+        setStats({
+          messagesTotal: totalMessagesTotal,
+          messagesToday: totalMessages,
+          avgResponseTime: 1.2, // Would need to track this separately
+          satisfaction: 94, // Would need feedback system for this
+          tokensUsed: 2.4, // Would need to track this
+          tokenLimit: 10,
+          status: onlineCount > 0 ? 'online' : 'offline',
+          uptime: avgUptime,
+          totalInstances: instances.length,
+          totalMonthlyCost: billingData.totalMonthlyCost || 0,
+          onlineInstances: onlineCount,
+        });
+      } catch (error) {
+        console.error('Failed to fetch real stats:', error);
+      }
+    };
+    
+    fetchRealStats();
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchRealStats, 30000);
     return () => clearInterval(interval);
   }, []);
 
+  // Load settings on mount
+  useEffect(() => {
+    setSettings(getSettings());
+  }, []);
+
+  // Scroll to bottom on new messages
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  // Send message
+  const sendMessage = async () => {
+    if (!inputMessage.trim()) return;
+
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: inputMessage,
+      timestamp: new Date(),
+    };
+    
+    setMessages(prev => [...prev, userMessage]);
+    setInputMessage('');
+    setIsTyping(true);
+
+    // Simulate AI response
+    await new Promise(r => setTimeout(r, 1000 + Math.random() * 1000));
+    
+    const responses = [
+      `I understand you're asking about "${inputMessage.slice(0, 30)}...". Let me help you with that!`,
+      `Great question! Based on your input, here's what I can tell you...`,
+      `Thanks for reaching out. I'd be happy to assist with your inquiry.`,
+      `I've analyzed your request. Here's my recommendation...`,
+    ];
+
+    const assistantMessage: Message = {
+      id: (Date.now() + 1).toString(),
+      role: 'assistant',
+      content: responses[Math.floor(Math.random() * responses.length)],
+      timestamp: new Date(),
+    };
+
+    setMessages(prev => [...prev, assistantMessage]);
+    setIsTyping(false);
+    setStats(prev => ({ ...prev, messagesToday: prev.messagesToday + 1 }));
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
-      {/* Mobile Nav Bar */}
-      <div className="lg:hidden flex items-center justify-between p-3 border-b border-slate-800 bg-slate-900/80 backdrop-blur-sm sticky top-0 z-40">
-        <Link href="/" className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center">
-            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-          </div>
-          <span className="text-lg font-bold text-white">Deep Signal</span>
-        </Link>
-        <nav className="flex items-center gap-1 overflow-x-auto" role="tablist" aria-label="Dashboard navigation">
-          {[
-            { id: 'overview', icon: '📊', label: 'Overview' },
-            { id: 'chat', icon: '💬', label: 'Chat' },
-            { id: 'analytics', icon: '📈', label: 'Analytics' },
-          ].map((item) => (
-            <button
-              key={item.id}
-              role="tab"
-              aria-selected={activeTab === item.id}
-              onClick={() => setActiveTab(item.id)}
-              className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs whitespace-nowrap transition-all ${
-                activeTab === item.id
-                  ? 'bg-cyan-500/20 text-cyan-400'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <span>{item.icon}</span>
-              <span>{item.label}</span>
-            </button>
-          ))}
-          <Link href="/dashboard/settings" className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs text-slate-400 hover:text-white whitespace-nowrap">
-            <span>⚙️</span>
-            <span>Settings</span>
-          </Link>
-        </nav>
-      </div>
-
       {/* Sidebar */}
       <aside className="fixed left-0 top-0 bottom-0 w-64 bg-slate-900/50 border-r border-slate-800 p-6 hidden lg:flex flex-col">
         <Link href="/" className="flex items-center gap-3 mb-10">
@@ -176,7 +224,7 @@ export default function Dashboard() {
             </div>
             
             <Link 
-              href="/mission-control"
+              href="https://missioncontrol.jgiebz.com"
               className="px-4 py-2 rounded-xl bg-slate-800/50 border border-slate-700 text-slate-300 hover:text-white transition-colors"
             >
               Mission Control
@@ -194,22 +242,23 @@ export default function Dashboard() {
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
               {[
-                { label: 'Messages Today', value: stats.messagesToday, change: '+12%', positive: true, icon: '💬' },
-                { label: 'Avg Response Time', value: `${stats.avgResponseTime}s`, change: '-0.3s', positive: true, icon: '⚡' },
-                { label: 'Satisfaction', value: `${stats.satisfaction}%`, change: '+2%', positive: true, icon: '😊' },
-                { label: 'Uptime', value: `${stats.uptime}%`, change: 'No incidents', positive: true, icon: '🟢' },
+                { label: 'Total Instances', value: stats.totalInstances, detail: `${stats.onlineInstances} online`, icon: '🖥️' },
+                { label: 'Messages Today', value: stats.messagesToday, detail: `${stats.messagesTotal.toLocaleString()} total`, icon: '💬' },
+                { label: 'Monthly Cost', value: `$${stats.totalMonthlyCost.toFixed(2)}`, detail: 'Infrastructure', icon: '💰' },
+                { label: 'Uptime', value: `${stats.uptime.toFixed(1)}%`, detail: stats.status === 'online' ? 'All systems operational' : 'System offline', icon: '🟢' },
               ].map((stat, i) => (
                 <div key={i} className="glass rounded-2xl p-6">
                   <div className="flex items-center justify-between mb-4">
                     <span className="text-3xl">{stat.icon}</span>
                     <span className={`text-xs px-2 py-1 rounded-full ${
-                      stat.positive ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
+                      stats.status === 'online' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-500/20 text-slate-400'
                     }`}>
-                      {stat.change}
+                      {stats.status}
                     </span>
                   </div>
                   <div className="text-3xl font-bold text-white mb-1">{stat.value}</div>
                   <div className="text-sm text-slate-400">{stat.label}</div>
+                  <div className="text-xs text-slate-500 mt-2">{stat.detail}</div>
                 </div>
               ))}
             </div>
@@ -223,7 +272,9 @@ export default function Dashboard() {
                   {[
                     { icon: '💬', label: 'Test Chat', action: () => setActiveTab('chat') },
                     { icon: '⚙️', label: 'Settings', href: '/dashboard/settings' },
-                    { icon: '📊', label: 'Analytics', action: () => setActiveTab('analytics') },
+                    { icon: '💰', label: 'Billing', href: '/dashboard/billing' },
+                    { icon: '📊', label: 'Usage', href: '/dashboard/usage' },
+                    { icon: '🖥️', label: 'Mission Control', href: 'https://missioncontrol.jgiebz.com' },
                     { icon: '📝', label: 'History', href: '/dashboard/conversations' },
                   ].map((action, i) => (
                     action.href ? (
@@ -301,109 +352,72 @@ export default function Dashboard() {
         {/* Chat Tab */}
         {activeTab === 'chat' && (
           <div className="flex flex-col h-[calc(100vh-80px)]">
-            {/* No deployment — prompt to onboard */}
-            {!deployment && (
-              <div className="flex-1 flex items-center justify-center p-6">
-                <div className="text-center max-w-md">
-                  <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-slate-800 flex items-center justify-center">
-                    <svg className="w-10 h-10 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                    </svg>
-                  </div>
-                  <h3 className="text-xl font-semibold text-white mb-2">No Instance Deployed</h3>
-                  <p className="text-slate-400 mb-6">Complete onboarding to deploy your AI agent, then chat with it live here.</p>
-                  <Link
-                    href="/onboarding"
-                    className="inline-flex px-6 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-medium hover:shadow-lg hover:shadow-cyan-500/25 transition-all"
-                  >
-                    Start Onboarding
-                  </Link>
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              {messages.length === 0 && (
+                <div className="text-center py-20">
+                  <div className="text-6xl mb-4">💬</div>
+                  <h3 className="text-xl font-semibold text-white mb-2">Start a conversation</h3>
+                  <p className="text-slate-400">Test your AI agent by sending a message</p>
                 </div>
-              </div>
-            )}
-
-            {/* Provisioning / not ready */}
-            {deployment && deployment.status !== 'ready' && !iframeError && (
-              <div className="flex-1 flex items-center justify-center p-6">
-                <div className="text-center max-w-md">
-                  <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center animate-pulse">
-                    <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                  </div>
-                  <h3 className="text-xl font-semibold text-white mb-2">Instance Starting Up</h3>
-                  <p className="text-slate-400 mb-4">Your agent is being provisioned. This usually takes 1-2 minutes.</p>
-                  <div className="text-sm font-mono text-cyan-400 mb-6">{deployment.domain}</div>
-                  <button
-                    onClick={() => {
-                      const state = getOnboardingState();
-                      if (state.deployment?.domain) {
-                        setDeployment({ domain: state.deployment.domain, status: state.deployment.status });
-                      }
-                    }}
-                    className="px-6 py-3 rounded-xl bg-slate-800/50 border border-slate-700 text-white font-medium hover:bg-slate-800 transition-colors"
-                  >
-                    Check Status
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Deployed — show iframe */}
-            {deployment && (deployment.status === 'ready' || deployment.status === 'timeout') && !iframeError && (
-              <div className="flex-1 relative">
-                {!iframeLoaded && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-slate-900/80 z-10">
-                    <div className="text-center">
-                      <div className="w-8 h-8 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-                      <p className="text-sm text-slate-400">Loading chat interface...</p>
+              )}
+              
+              {messages.map((msg) => (
+                <div
+                  key={msg.id}
+                  className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                >
+                  <div className={`max-w-[70%] p-4 rounded-2xl ${
+                    msg.role === 'user'
+                      ? 'bg-cyan-500/20 text-white border border-cyan-500/30'
+                      : 'bg-slate-800 text-white'
+                  }`}>
+                    <div className="text-xs text-slate-400 mb-1">
+                      {msg.role === 'user' ? 'You' : settings.agentName}
+                    </div>
+                    <p>{msg.content}</p>
+                    <div className="text-xs text-slate-500 mt-2">
+                      {msg.timestamp.toLocaleTimeString()}
                     </div>
                   </div>
-                )}
-                <iframe
-                  src={`https://${deployment.domain}/chat`}
-                  className="w-full h-full border-0"
-                  sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
-                  onLoad={() => setIframeLoaded(true)}
-                  onError={() => setIframeError(true)}
-                  title="Live Chat"
-                />
-              </div>
-            )}
-
-            {/* Error fallback */}
-            {deployment && iframeError && (
-              <div className="flex-1 flex items-center justify-center p-6">
-                <div className="text-center max-w-md">
-                  <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-rose-500/20 flex items-center justify-center">
-                    <svg className="w-10 h-10 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                  </div>
-                  <h3 className="text-xl font-semibold text-white mb-2">Could Not Load Chat</h3>
-                  <p className="text-slate-400 mb-6">The chat interface failed to load. Your instance may still be starting up.</p>
-                  <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-                    <button
-                      onClick={() => {
-                        setIframeError(false);
-                        setIframeLoaded(false);
-                      }}
-                      className="px-6 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-medium hover:shadow-lg hover:shadow-cyan-500/25 transition-all"
-                    >
-                      Retry
-                    </button>
-                    <a
-                      href={`https://${deployment.domain}/chat`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-6 py-3 rounded-xl bg-slate-800/50 border border-slate-700 text-white font-medium hover:bg-slate-800 transition-colors"
-                    >
-                      Open in New Tab
-                    </a>
+                </div>
+              ))}
+              
+              {isTyping && (
+                <div className="flex justify-start">
+                  <div className="bg-slate-800 rounded-2xl p-4">
+                    <div className="flex gap-1">
+                      <span className="w-2 h-2 bg-slate-500 rounded-full animate-bounce" />
+                      <span className="w-2 h-2 bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
+                      <span className="w-2 h-2 bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                    </div>
                   </div>
                 </div>
+              )}
+              
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* Input */}
+            <div className="p-4 border-t border-slate-800">
+              <div className="flex gap-4">
+                <input
+                  type="text"
+                  value={inputMessage}
+                  onChange={(e) => setInputMessage(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+                  placeholder="Type a message..."
+                  className="flex-1 px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
+                />
+                <button
+                  onClick={sendMessage}
+                  disabled={!inputMessage.trim() || isTyping}
+                  className="px-6 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-cyan-500/25 transition-all"
+                >
+                  Send
+                </button>
               </div>
-            )}
+            </div>
           </div>
         )}
 

@@ -116,10 +116,7 @@ export interface OnboardingState {
     id: number;
     hostname: string;
     ip: string;
-    domain: string;
     status: string;
-    dashboardUrl: string | null;
-    gatewayToken: string;
   };
 }
 

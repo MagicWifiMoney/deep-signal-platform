@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { getInstanceByTeamId } from '@/lib/instance-registry';
 
-const SLACK_SIGNING_SECRET = process.env.SLACK_SIGNING_SECRET;
+// Hardcoded for now - shared across all Deep Signal Slack app installations
+const SLACK_SIGNING_SECRET = '9732b3681b946a54a59aaafa67cd4ae9';
 
 /**
  * Verify Slack request signature

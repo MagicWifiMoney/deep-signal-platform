@@ -1,11 +1,10 @@
 import { NextResponse } from 'next/server';
-import crypto from 'crypto';
 
 const HETZNER_API_TOKEN = process.env.HETZNER_API_TOKEN;
 const HETZNER_API = 'https://api.hetzner.cloud/v1';
 
 const CLOUDFLARE_API_TOKEN = process.env.CLOUDFLARE_API_TOKEN;
-const CLOUDFLARE_ZONE_ID = process.env.CLOUDFLARE_ZONE_ID;
+const CLOUDFLARE_ZONE_ID = process.env.CLOUDFLARE_ZONE_ID || '1af99eb0c0c30a67f2f272d4dff24cc8';
 const DOMAIN_SUFFIX = 'ds.jgiebz.com';
 
 // Sanitize string for Hetzner labels and DNS (lowercase alphanumeric + hyphens, max 63 chars)
@@ -44,20 +43,12 @@ interface OnboardingData {
 
 // Cloud-init script that sets up everything with Caddy for HTTPS
 function generateCloudInit(data: OnboardingData, domain: string, token: string): string {
-  const modelMap: Record<string, Record<string, string>> = {
-    anthropic: {
-      haiku: 'claude-haiku-4-5-20251001',
-      sonnet: 'claude-sonnet-4-5-20250929',
-      opus: 'claude-opus-4-6',
-    },
-    openrouter: {
-      haiku: 'anthropic/claude-haiku-3-5',
-      sonnet: 'anthropic/claude-sonnet-4',
-      opus: 'anthropic/claude-opus-4',
-    },
+  const modelMap: Record<string, string> = {
+    haiku: 'anthropic/claude-haiku-3-5',
+    sonnet: 'anthropic/claude-sonnet-4',
+    opus: 'anthropic/claude-opus-4',
   };
-  const providerModels = modelMap[data.apiProvider] || modelMap.openrouter;
-  const modelId = providerModels[data.model] || providerModels.haiku;
+  const modelId = modelMap[data.model] || 'anthropic/claude-haiku-3-5';
   
   const apiKeyEnvName = data.apiProvider === 'anthropic' ? 'ANTHROPIC_API_KEY' : 'OPENROUTER_API_KEY';
   
@@ -121,18 +112,6 @@ ${toneDescription}
 
 set -e
 
-echo ">>> Creating openclaw service user..."
-useradd --system --create-home --shell /usr/sbin/nologin openclaw
-
-echo ">>> Configuring UFW firewall..."
-apt-get install -y ufw
-ufw default deny incoming
-ufw default allow outgoing
-ufw allow 22/tcp
-ufw allow 80/tcp
-ufw allow 443/tcp
-ufw --force enable
-
 echo ">>> Installing Node.js..."
 curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
 apt-get install -y nodejs
@@ -148,20 +127,17 @@ echo ">>> Installing OpenClaw..."
 npm install -g openclaw
 
 echo ">>> Creating OpenClaw config..."
-mkdir -p /home/openclaw/.openclaw/agents/main/agent
-chown -R openclaw:openclaw /home/openclaw/.openclaw
+mkdir -p /root/.openclaw/agents/main/agent
 
 # Main config
-cat > /home/openclaw/.openclaw/openclaw.json << 'EOFCONFIG'
+cat > /root/.openclaw/openclaw.json << 'EOFCONFIG'
 ${openclawConfig}
 EOFCONFIG
 
 # Agent personality
-cat > /home/openclaw/.openclaw/SOUL.md << 'EOFSOUL'
+cat > /root/.openclaw/SOUL.md << 'EOFSOUL'
 ${escapedSoul}
 EOFSOUL
-
-chown -R openclaw:openclaw /home/openclaw/.openclaw
 
 echo ">>> Creating OpenClaw systemd service..."
 cat > /etc/systemd/system/openclaw.service << EOFSERVICE
@@ -171,17 +147,12 @@ After=network.target
 
 [Service]
 Type=simple
-User=openclaw
-WorkingDirectory=/home/openclaw
+User=root
 Environment=${apiKeyEnvName}='${escapedApiKey}'
 Environment=OPENCLAW_GATEWAY_TOKEN=${token}
-Environment=HOME=/home/openclaw
 ExecStart=/usr/bin/openclaw gateway --port 3000 --bind lan
 Restart=always
 RestartSec=10
-NoNewPrivileges=true
-ProtectSystem=strict
-ReadWritePaths=/home/openclaw
 
 [Install]
 WantedBy=multi-user.target
@@ -191,10 +162,6 @@ echo ">>> Configuring Caddy for HTTPS..."
 cat > /etc/caddy/Caddyfile << 'EOFCADDY'
 ${domain} {
     reverse_proxy localhost:3000
-    header /chat* {
-        Content-Security-Policy "frame-ancestors 'self' https://deep-signal-platform.vercel.app https://*.vercel.app http://localhost:*"
-        -X-Frame-Options
-    }
 }
 EOFCADDY
 
@@ -247,7 +214,7 @@ async function createDnsRecord(subdomain: string, ip: string): Promise<{ success
             name: fullDomain,
             content: ip,
             ttl: 300,
-            proxied: true,
+            proxied: false, // Direct connection for WebSocket support
           }),
         }
       );
@@ -271,7 +238,7 @@ async function createDnsRecord(subdomain: string, ip: string): Promise<{ success
             name: fullDomain,
             content: ip,
             ttl: 300,
-            proxied: true,
+            proxied: false,
           }),
         }
       );
@@ -292,13 +259,6 @@ export async function POST(request: Request) {
   if (!HETZNER_API_TOKEN) {
     return NextResponse.json(
       { error: 'Hetzner API not configured. Please add HETZNER_API_TOKEN to environment variables.', code: 'NO_API_KEY' },
-      { status: 500 }
-    );
-  }
-
-  if (!CLOUDFLARE_ZONE_ID || !CLOUDFLARE_API_TOKEN) {
-    return NextResponse.json(
-      { error: 'Cloudflare not configured. Please add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ZONE_ID to environment variables.' },
       { status: 500 }
     );
   }
@@ -327,12 +287,6 @@ export async function POST(request: Request) {
         { error: 'Company name and API key are required' },
         { status: 400 }
       );
-    }
-
-    // Validate API key format (advisory, not blocking for edge cases)
-    const apiKeyPrefix = data.apiProvider === 'anthropic' ? 'sk-ant-' : 'sk-or-';
-    if (!data.apiKey.startsWith(apiKeyPrefix)) {
-      console.warn(`API key format warning: expected prefix '${apiKeyPrefix}' for ${data.apiProvider}, got '${data.apiKey.substring(0, 7)}...'`);
     }
 
     const slug = createSlug(data.companyName);
@@ -375,7 +329,7 @@ export async function POST(request: Request) {
     }
 
     // Generate gateway token and cloud-init script
-    const gatewayToken = `ds-${crypto.randomBytes(24).toString('base64url')}`;
+    const gatewayToken = `ds-${Date.now().toString(36)}`;
     const cloudInit = generateCloudInit(data, domain, gatewayToken);
 
     // Create the server

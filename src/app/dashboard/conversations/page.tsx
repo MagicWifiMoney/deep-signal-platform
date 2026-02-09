@@ -118,7 +118,7 @@ export default function Conversations() {
               onChange={(e) => setSearch(e.target.value)}
               className="w-64 pl-10 pr-4 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none text-sm"
             />
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" aria-label="Search" role="img">🔍</span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">🔍</span>
           </div>
           
           <button className="px-4 py-2 rounded-xl bg-slate-800 text-white hover:bg-slate-700 transition-colors text-sm">
@@ -129,7 +129,7 @@ export default function Conversations() {
 
       <div className="flex h-[calc(100vh-80px)]">
         {/* Sidebar - Conversation List */}
-        <aside className="w-full md:w-96 border-r border-slate-800 flex flex-col">
+        <aside className="w-96 border-r border-slate-800 flex flex-col">
           {/* Filters */}
           <div className="p-4 border-b border-slate-800">
             <div className="flex gap-2">
@@ -142,8 +142,6 @@ export default function Conversations() {
                 <button
                   key={f.id}
                   onClick={() => setFilter(f.id)}
-                  aria-label={`Filter conversations: ${f.label}`}
-                  aria-pressed={filter === f.id}
                   className={`px-3 py-1 rounded-lg text-sm transition-colors ${
                     filter === f.id
                       ? 'bg-cyan-500 text-white'
@@ -161,11 +159,7 @@ export default function Conversations() {
             {filteredConvos.map((convo) => (
               <div
                 key={convo.id}
-                role="button"
-                tabIndex={0}
-                aria-label={`Conversation with ${convo.user}: ${convo.summary}`}
                 onClick={() => setSelectedConvo(convo)}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedConvo(convo); } }}
                 className={`p-4 border-b border-slate-800/50 cursor-pointer transition-colors ${
                   selectedConvo?.id === convo.id
                     ? 'bg-cyan-500/10 border-l-2 border-l-cyan-500'
@@ -251,38 +245,16 @@ export default function Conversations() {
               {/* Actions */}
               <div className="p-4 border-t border-slate-800 flex items-center justify-between">
                 <div className="flex gap-2">
-                  <button
-                    onClick={() => {
-                      const text = selectedConvo.messages_preview.map((m) => `${m.role}: ${m.content}`).join('\n');
-                      navigator.clipboard.writeText(text);
-                      alert('Transcript copied to clipboard');
-                    }}
-                    className="px-4 py-2 rounded-lg bg-slate-800 text-white hover:bg-slate-700 transition-colors text-sm"
-                  >
-                    Copy Transcript
+                  <button className="px-4 py-2 rounded-lg bg-slate-800 text-white hover:bg-slate-700 transition-colors text-sm">
+                    📋 Copy Transcript
                   </button>
-                  <button
-                    onClick={() => {
-                      const text = selectedConvo.messages_preview.map((m) => `"${m.role}","${m.content.replace(/"/g, '""')}"`).join('\n');
-                      const blob = new Blob([`"Role","Content"\n${text}`], { type: 'text/csv' });
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement('a');
-                      a.href = url;
-                      a.download = `conversation-${selectedConvo.id}.csv`;
-                      a.click();
-                      URL.revokeObjectURL(url);
-                    }}
-                    className="px-4 py-2 rounded-lg bg-slate-800 text-white hover:bg-slate-700 transition-colors text-sm"
-                  >
-                    Export CSV
+                  <button className="px-4 py-2 rounded-lg bg-slate-800 text-white hover:bg-slate-700 transition-colors text-sm">
+                    📤 Export
                   </button>
                 </div>
                 {selectedConvo.status === 'active' && (
-                  <button
-                    onClick={() => alert('Escalation feature requires Slack/email integration. Coming soon.')}
-                    className="px-4 py-2 rounded-lg bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 transition-colors text-sm"
-                  >
-                    Escalate to Human
+                  <button className="px-4 py-2 rounded-lg bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 transition-colors text-sm">
+                    🚨 Escalate to Human
                   </button>
                 )}
               </div>

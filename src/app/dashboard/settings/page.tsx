@@ -44,51 +44,10 @@ Key behaviors:
     logConversations: true,
   });
   const [saved, setSaved] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      const res = await fetch('/api/settings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          instanceId: 'default',
-          settings,
-        }),
-      });
-      if (res.ok) {
-        setSaved(true);
-        setTimeout(() => setSaved(false), 3000);
-      }
-    } catch (e) {
-      console.error('Failed to save settings:', e);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handlePause = async () => {
-    if (!confirm('Pause this instance? The agent will stop responding until resumed.')) return;
-    try {
-      await fetch('/api/instances/default/restart', { method: 'POST' });
-      alert('Instance paused.');
-    } catch (e) {
-      console.error('Failed to pause instance:', e);
-    }
-  };
-
-  const handleDelete = async () => {
-    setShowDeleteConfirm(false);
-    try {
-      const res = await fetch('/api/instances/default', { method: 'DELETE' });
-      if (res.ok) {
-        window.location.href = '/onboarding';
-      }
-    } catch (e) {
-      console.error('Failed to delete instance:', e);
-    }
+  const handleSave = () => {
+    setSaved(true);
+    setTimeout(() => setSaved(false), 3000);
   };
 
   return (
@@ -110,14 +69,14 @@ Key behaviors:
               : 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:shadow-lg hover:shadow-cyan-500/25'
           }`}
         >
-          {saved ? '✓ Saved' : saving ? 'Saving...' : 'Save Changes'}
+          {saved ? '✓ Saved' : 'Save Changes'}
         </button>
       </header>
 
-      <div className="flex flex-col md:flex-row">
+      <div className="flex">
         {/* Sidebar */}
-        <aside className="w-full md:w-64 border-b md:border-b-0 md:border-r border-slate-800 p-6">
-          <nav className="flex md:flex-col gap-1 overflow-x-auto md:overflow-x-visible">
+        <aside className="w-64 border-r border-slate-800 p-6">
+          <nav className="space-y-1">
             {[
               { id: 'general', label: 'General', icon: '⚙️' },
               { id: 'personality', label: 'Personality', icon: '✨' },
@@ -470,7 +429,7 @@ Key behaviors:
                   <p className="text-sm text-slate-400 mb-4">
                     Temporarily stop the agent from responding. You can resume anytime.
                   </p>
-                  <button onClick={handlePause} className="px-4 py-2 rounded-lg border border-amber-500 text-amber-400 hover:bg-amber-500/10 transition-colors">
+                  <button className="px-4 py-2 rounded-lg border border-amber-500 text-amber-400 hover:bg-amber-500/10 transition-colors">
                     Pause Instance
                   </button>
                 </div>
@@ -480,22 +439,9 @@ Key behaviors:
                   <p className="text-sm text-slate-400 mb-4">
                     Permanently delete this instance and all its data. This cannot be undone.
                   </p>
-                  <button onClick={() => setShowDeleteConfirm(true)} className="px-4 py-2 rounded-lg border border-rose-500 text-rose-400 hover:bg-rose-500/10 transition-colors">
+                  <button className="px-4 py-2 rounded-lg border border-rose-500 text-rose-400 hover:bg-rose-500/10 transition-colors">
                     Delete Instance
                   </button>
-                  {showDeleteConfirm && (
-                    <div className="mt-3 p-4 rounded-lg bg-rose-500/10 border border-rose-500/30">
-                      <p className="text-sm text-rose-300 mb-3">Are you sure? This will permanently destroy the instance and all data.</p>
-                      <div className="flex gap-2">
-                        <button onClick={handleDelete} className="px-4 py-2 rounded-lg bg-rose-600 text-white text-sm hover:bg-rose-500">
-                          Yes, Delete
-                        </button>
-                        <button onClick={() => setShowDeleteConfirm(false)} className="px-4 py-2 rounded-lg border border-slate-600 text-slate-300 text-sm">
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>

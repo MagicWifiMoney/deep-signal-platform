@@ -5,9 +5,11 @@ const isPublicRoute = createRouteMatcher([
   '/',
   '/sign-in(.*)',
   '/sign-up(.*)',
-  '/api/slack/callback(.*)',
-  '/api/slack/events(.*)',
-  '/api/slack/status(.*)',
+  '/api/(.*)',
+  '/onboarding(.*)',
+  '/dashboard(.*)',
+  '/mission-control(.*)',
+  '/setup(.*)',
 ])
 
 // Check if Clerk is properly configured

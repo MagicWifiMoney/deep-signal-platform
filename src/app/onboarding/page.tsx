@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
-import { saveOnboardingState, getOnboardingState } from '@/lib/store';
+import Image from 'next/image';
 
 const STEPS = [
   { id: 'welcome', title: 'Welcome' },
@@ -88,41 +88,6 @@ export default function Onboarding() {
     agentName: 'AI Assistant',
     tone: 'professional',
   });
-  const [hasSavedState, setHasSavedState] = useState(false);
-
-  // Restore onboarding progress from localStorage on mount
-  useEffect(() => {
-    const saved = getOnboardingState();
-    if (saved.step > 0 || (saved.data && Object.keys(saved.data).length > 0)) {
-      setHasSavedState(true);
-      setCurrentStep(saved.step);
-      setFormData(prev => ({
-        ...prev,
-        ...saved.data,
-        icps: prev.icps, // keep default since icps aren't stored in onboarding state
-        apiProvider: (saved.data.apiProvider as 'anthropic' | 'openrouter') || prev.apiProvider,
-      }));
-    }
-  }, []);
-
-  // Save onboarding state whenever step or form data changes
-  useEffect(() => {
-    saveOnboardingState({
-      step: currentStep,
-      data: {
-        companyName: formData.companyName,
-        industry: formData.industry,
-        useCase: formData.useCase,
-        apiProvider: formData.apiProvider,
-        apiKey: formData.apiKey,
-        model: formData.model,
-        channel: formData.channel,
-        agentName: formData.agentName,
-        tone: formData.tone,
-      },
-    });
-  }, [currentStep, formData]);
-
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
   const [companyAnalysis, setCompanyAnalysis] = useState<CompanyAnalysis | null>(null);
@@ -130,24 +95,6 @@ export default function Onboarding() {
   const [deployError, setDeployError] = useState<string | null>(null);
   const [deployment, setDeployment] = useState<DeploymentStatus | null>(null);
   const [deployProgress, setDeployProgress] = useState(0);
-
-  // Save deployment state whenever it changes
-  useEffect(() => {
-    if (deployment) {
-      saveOnboardingState({
-        deployment: {
-          id: deployment.id,
-          hostname: deployment.hostname,
-          ip: deployment.ip,
-          domain: deployment.domain,
-          status: deployment.status,
-          dashboardUrl: deployment.dashboardUrl,
-          gatewayToken: deployment.gatewayToken,
-        },
-        completed: deployment.openclawReady,
-      });
-    }
-  }, [deployment]);
 
   const updateForm = (key: string, value: string | string[]) => {
     setFormData(prev => ({ ...prev, [key]: value }));
@@ -301,10 +248,11 @@ export default function Onboarding() {
         } else {
           setDeployment(prev => prev ? {
             ...prev,
-            status: 'timeout',
+            status: 'ready',
             dashboardUrl: `http://${prev.ip}:3000`,
           } : null);
           setIsDeploying(false);
+          nextStep();
         }
       } catch (error) {
         if (attempts < maxAttempts) {
@@ -330,14 +278,7 @@ export default function Onboarding() {
             <p className="text-xl text-slate-400 mb-8">
               Deploy your dedicated AI agent in under 5 minutes.
             </p>
-            {hasSavedState && (
-              <div className="mb-6 p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/30">
-                <p className="text-sm text-cyan-300">
-                  Resume where you left off — your previous progress has been saved.
-                </p>
-              </div>
-            )}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-left mb-8">
+            <div className="grid grid-cols-3 gap-6 text-left mb-8">
               {[
                 { title: 'Private Instance', text: 'Your own isolated server' },
                 { title: 'Zero-Knowledge', text: 'We never see your data' },
@@ -494,23 +435,10 @@ export default function Onboarding() {
                   placeholder={formData.apiProvider === 'anthropic' ? 'sk-ant-...' : 'sk-or-v1-...'}
                 />
                 <p className="text-xs text-slate-500 mt-2">
-                  Get your key: {formData.apiProvider === 'anthropic'
-                    ? 'console.anthropic.com'
+                  Get your key: {formData.apiProvider === 'anthropic' 
+                    ? 'console.anthropic.com' 
                     : 'openrouter.ai/keys'}
                 </p>
-                {formData.apiKey.trim() !== '' && (
-                  (formData.apiProvider === 'anthropic' && !formData.apiKey.startsWith('sk-ant-')) ||
-                  (formData.apiProvider === 'openrouter' && !formData.apiKey.startsWith('sk-or-'))
-                ) && (
-                  <div className="mt-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-start gap-2">
-                    <svg className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                    <p className="text-xs text-amber-300">
-                      This doesn&apos;t look like a valid {formData.apiProvider === 'anthropic' ? 'Anthropic' : 'OpenRouter'} API key. Please double-check.
-                    </p>
-                  </div>
-                )}
               </div>
               
               <div className="p-4 rounded-xl bg-slate-800/30 border border-slate-700">
@@ -556,7 +484,7 @@ export default function Onboarding() {
                       {model.cost}
                     </span>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+                  <div className="grid grid-cols-3 gap-4 text-sm">
                     <div>
                       <span className="text-slate-500 text-xs">Speed</span>
                       <div className="text-cyan-400">{model.speed}</div>
@@ -892,56 +820,6 @@ export default function Onboarding() {
               </>
             )}
 
-            {!isDeploying && deployment?.status === 'timeout' && (
-              <div className="text-center">
-                <div className="w-20 h-20 mx-auto mb-8 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center">
-                  <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <h2 className="text-3xl font-bold text-white mb-4">Still Setting Up</h2>
-                <p className="text-slate-400 mb-6">
-                  Your server is still provisioning. This can take up to 5 minutes.
-                </p>
-                <div className="max-w-md mx-auto p-4 rounded-xl bg-slate-800/50 border border-slate-700 mb-8">
-                  <p className="text-sm text-slate-300 mb-2">You can check the status at:</p>
-                  <a
-                    href={`https://${deployment.domain}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-cyan-400 hover:underline font-mono text-sm break-all"
-                  >
-                    https://{deployment.domain}
-                  </a>
-                  <div className="mt-2 text-xs text-slate-500">
-                    IP: {deployment.ip}
-                  </div>
-                </div>
-                <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                  <button
-                    onClick={() => {
-                      setIsDeploying(true);
-                      setDeployment(prev => prev ? { ...prev, status: 'provisioning' } : null);
-                      setDeployProgress(30);
-                      pollDeploymentStatus(deployment.id);
-                    }}
-                    className="px-8 py-4 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-semibold hover:shadow-lg hover:shadow-cyan-500/25 transition-all"
-                  >
-                    Check Again
-                  </button>
-                  <button
-                    onClick={() => {
-                      setDeployment(prev => prev ? { ...prev, status: 'ready' } : null);
-                      nextStep();
-                    }}
-                    className="text-sm text-slate-400 hover:text-white transition-colors underline"
-                  >
-                    Go to Dashboard Anyway
-                  </button>
-                </div>
-              </div>
-            )}
-
             {isDeploying && (
               <div className="text-center">
                 <div className="w-20 h-20 mx-auto mb-8 rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center animate-pulse">
@@ -1129,7 +1007,7 @@ export default function Onboarding() {
                 </a>
               )}
               <Link 
-                href="/mission-control"
+                href="https://missioncontrol.jgiebz.com"
                 className="px-8 py-4 rounded-xl bg-slate-800/50 border border-slate-700 text-white font-semibold hover:bg-slate-800 transition-colors"
               >
                 Mission Control
