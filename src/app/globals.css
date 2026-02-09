@@ -119,3 +119,56 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--muted-foreground) / 0.5);
 }
+
+/* Mind reader callout */
+.mind-reader {
+  border-left: 2px solid hsl(var(--ds-cyan) / 0.5);
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 0 0.75rem 0.75rem 0;
+  padding: 1.5rem 2rem;
+  margin: 2rem 0;
+}
+
+/* Section number watermark */
+.section-number {
+  font-size: 6rem;
+  font-weight: 700;
+  line-height: 1;
+  background: linear-gradient(180deg, rgba(255,255,255,0.08), transparent);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Cost breakdown row */
+.cost-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* FAQ accordion */
+.faq-answer {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease, padding 0.3s ease;
+}
+
+.faq-answer.open {
+  max-height: 500px;
+}
+
+/* Section progress dot */
+.progress-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  transition: all 0.3s ease;
+}
+
+.progress-dot.active {
+  background: hsl(var(--ds-cyan));
+  box-shadow: 0 0 8px hsl(var(--ds-cyan) / 0.5);
+}
