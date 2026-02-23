@@ -73,7 +73,8 @@ function generateCloudInit(data: OnboardingData, domain: string, token: string):
       port: 3000,
       auth: {
         token: token
-      }
+      },
+      deviceAuth: 'open'
     },
     commands: {
       restart: true

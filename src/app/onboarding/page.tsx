@@ -95,6 +95,17 @@ export default function Onboarding() {
   const [deployError, setDeployError] = useState<string | null>(null);
   const [deployment, setDeployment] = useState<DeploymentStatus | null>(null);
   const [deployProgress, setDeployProgress] = useState(0);
+  const [tokenCopied, setTokenCopied] = useState(false);
+
+  const copyToken = async (token: string) => {
+    try {
+      await navigator.clipboard.writeText(token);
+      setTokenCopied(true);
+      setTimeout(() => setTokenCopied(false), 2000);
+    } catch {
+      // fallback: select text
+    }
+  };
 
   const updateForm = (key: string, value: string | string[]) => {
     setFormData(prev => ({ ...prev, [key]: value }));
@@ -892,7 +903,7 @@ export default function Onboarding() {
                 Your AI agent is deployed and ready to assist your customers.
               </p>
             </div>
-            
+
             {/* Instance Details */}
             <div className="rounded-xl border border-slate-700 overflow-hidden mb-6">
               <div className="px-6 py-4 bg-slate-800/50 border-b border-slate-700">
@@ -903,7 +914,7 @@ export default function Onboarding() {
                   <>
                     <div className="flex justify-between">
                       <span className="text-slate-400">Dashboard URL</span>
-                      <a href={deployment.dashboardUrl || '#'} target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline font-mono">
+                      <a href={`https://${deployment.domain}/#token=${deployment.gatewayToken}`} target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline font-mono">
                         {deployment.domain}
                       </a>
                     </div>
@@ -913,7 +924,17 @@ export default function Onboarding() {
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-slate-400">Gateway Token</span>
-                      <code className="px-2 py-1 rounded bg-slate-800 text-cyan-400 font-mono text-xs">{deployment.gatewayToken}</code>
+                      <button
+                        onClick={() => copyToken(deployment.gatewayToken)}
+                        className="flex items-center gap-2 px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 transition-colors group"
+                        title="Click to copy"
+                      >
+                        <code className="text-cyan-400 font-mono text-xs">{deployment.gatewayToken}</code>
+                        <svg className="w-3 h-3 text-slate-400 group-hover:text-cyan-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                        {tokenCopied && <span className="text-emerald-400 text-xs">Copied!</span>}
+                      </button>
                     </div>
                   </>
                 )}
@@ -931,20 +952,26 @@ export default function Onboarding() {
               </div>
             </div>
 
-            {/* Gateway Token Instructions */}
-            <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 mb-6">
-              <div className="flex items-start gap-3">
-                <svg className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                <div>
-                  <div className="text-sm font-medium text-white mb-1">Save Your Gateway Token</div>
-                  <p className="text-xs text-slate-400">
-                    You'll need to enter this token in the Control UI settings when you first access your dashboard.
-                    Copy it now: <code className="px-1 py-0.5 rounded bg-slate-800 text-amber-400">{deployment?.gatewayToken}</code>
-                  </p>
-                </div>
-              </div>
+            {/* Primary CTAs */}
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
+              {deployment && (
+                <Link
+                  href={`/setup/wizard?domain=${deployment.domain}&token=${deployment.gatewayToken}&name=${encodeURIComponent(formData.agentName)}&company=${encodeURIComponent(formData.companyName)}`}
+                  className="w-full sm:w-auto text-center px-8 py-4 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-semibold hover:shadow-lg hover:shadow-cyan-500/25 transition-all"
+                >
+                  Set Up Your Agent →
+                </Link>
+              )}
+              {deployment && (
+                <a
+                  href={`https://${deployment.domain}/#token=${deployment.gatewayToken}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full sm:w-auto text-center px-8 py-4 rounded-xl bg-slate-800/50 border border-slate-700 text-white font-semibold hover:bg-slate-800 transition-colors"
+                >
+                  Skip to Dashboard →
+                </a>
+              )}
             </div>
 
             {/* Channel Setup */}
@@ -993,25 +1020,6 @@ export default function Onboarding() {
                   </svg>
                 </Link>
               </div>
-            </div>
-            
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              {deployment?.dashboardUrl && (
-                <a 
-                  href={deployment.dashboardUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-8 py-4 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-semibold hover:shadow-lg hover:shadow-cyan-500/25 transition-all"
-                >
-                  Open Dashboard
-                </a>
-              )}
-              <Link 
-                href="https://missioncontrol.jgiebz.com"
-                className="px-8 py-4 rounded-xl bg-slate-800/50 border border-slate-700 text-white font-semibold hover:bg-slate-800 transition-colors"
-              >
-                Mission Control
-              </Link>
             </div>
           </div>
         );
