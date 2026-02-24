@@ -37,7 +37,11 @@ function sanitizeLabel(str: string): string {
 }
 
 async function createDnsRecord(subdomain: string, ip: string): Promise<void> {
-  if (!CLOUDFLARE_API_TOKEN) return;
+  console.log(`[DNS] createDnsRecord called: subdomain=${subdomain}, ip=${ip}, hasToken=${!!CLOUDFLARE_API_TOKEN}, zoneId=${CLOUDFLARE_ZONE_ID}`);
+  if (!CLOUDFLARE_API_TOKEN) {
+    console.error('[DNS] CLOUDFLARE_API_TOKEN is missing - cannot create DNS record');
+    return;
+  }
   const fullDomain = `${subdomain}.${DOMAIN_SUFFIX}`;
   try {
     const checkRes = await fetch(
@@ -49,13 +53,15 @@ async function createDnsRecord(subdomain: string, ip: string): Promise<void> {
     const url = checkData.result?.length > 0
       ? `https://api.cloudflare.com/client/v4/zones/${CLOUDFLARE_ZONE_ID}/dns_records/${checkData.result[0].id}`
       : `https://api.cloudflare.com/client/v4/zones/${CLOUDFLARE_ZONE_ID}/dns_records`;
-    await fetch(url, {
+    const dnsRes = await fetch(url, {
       method,
       headers: { Authorization: `Bearer ${CLOUDFLARE_API_TOKEN}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ type: 'A', name: fullDomain, content: ip, ttl: 300, proxied: false }),
     });
+    const dnsResult = await dnsRes.json();
+    console.log(`[DNS] ${method} ${fullDomain} -> ${ip}: success=${dnsResult.success}`, dnsResult.success ? '' : JSON.stringify(dnsResult.errors));
   } catch (e) {
-    console.error('DNS error:', e);
+    console.error('[DNS] DNS creation error:', e);
   }
 }
 
