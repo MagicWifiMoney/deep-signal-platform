@@ -623,8 +623,8 @@ export async function POST(request: Request) {
   }
 
   try {
-    // Validation - require at least an agent name or company name
-    if (!data.agentName && !data.companyName) {
+    // Validation - require at least an agent name or company name (must be non-empty strings)
+    if (!data.agentName?.trim() && !data.companyName?.trim()) {
       return NextResponse.json(
         { error: 'Missing required field: agentName or companyName must be provided' },
         { status: 400 }
