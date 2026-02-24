@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import crypto from 'crypto';
 
 const HETZNER_API_TOKEN = process.env.HETZNER_API_TOKEN;
 const HETZNER_API = 'https://api.hetzner.cloud/v1';
@@ -6,6 +7,28 @@ const HETZNER_API = 'https://api.hetzner.cloud/v1';
 const CLOUDFLARE_API_TOKEN = process.env.CLOUDFLARE_API_TOKEN;
 const CLOUDFLARE_ZONE_ID = process.env.CLOUDFLARE_ZONE_ID || '1af99eb0c0c30a67f2f272d4dff24cc8';
 const DOMAIN_SUFFIX = 'ds.jgiebz.com';
+
+// ── Rate Limiting ─────────────────────────────────────────────────────────────
+// Simple in-memory rate limiter: max 3 deploys per IP per hour
+const rateLimitMap = new Map<string, number[]>();
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const windowMs = 60 * 60 * 1000; // 1 hour
+  const maxRequests = 3;
+
+  const timestamps = (rateLimitMap.get(ip) || []).filter(
+    (t) => now - t < windowMs
+  );
+
+  if (timestamps.length >= maxRequests) {
+    return false; // rate limited
+  }
+
+  timestamps.push(now);
+  rateLimitMap.set(ip, timestamps);
+  return true;
+}
 
 // Sanitize string for Hetzner labels and DNS (lowercase alphanumeric + hyphens, max 63 chars)
 function sanitizeLabel(str: string): string {
@@ -180,6 +203,13 @@ Your agent can help walk users through connecting channels after deployment.
 4. Copy the Bot Token (starts with xoxb-)
 5. Run: openclaw config set channels.slack.token YOUR_TOKEN
 
+### WhatsApp
+1. Your agent will generate a QR code on first request
+2. Open WhatsApp on your phone
+3. Go to Settings - Linked Devices - Link a Device
+4. Scan the QR code shown by your agent
+5. Run: openclaw channels enable whatsapp
+
 ### Upgrading your AI model
 If you're on the free tier and want to upgrade:
 1. Get an API key from console.anthropic.com (Anthropic) or platform.openai.com (OpenAI)
@@ -231,7 +261,7 @@ ${channelGuide}
 }
 
 // ── Cloud-init script ─────────────────────────────────────────────────────────
-function generateCloudInit(data: OnboardingData, domain: string, token: string): string {
+export function generateCloudInit(data: OnboardingData, domain: string, token: string): string {
   const provider = (data.apiProvider || 'free') as keyof typeof providerConfigs;
   const config = providerConfigs[provider] || providerConfigs.free;
   const modelId = config.model;
@@ -307,14 +337,14 @@ function generateCloudInit(data: OnboardingData, domain: string, token: string):
   // Escape single quotes for bash heredocs
   const escapedConfig = openclawConfig.replace(/'/g, "'\\''");
   const escapedSoul = soulContent.replace(/'/g, "'\\''");
-  const escapedApiKey = (data.apiKey || '').replace(/'/g, "'\\''");
 
   const agentName = data.agentName || 'Agent';
   const companyName = data.companyName || agentName;
 
   // API key environment line (only if we have one)
-  const envLine = apiKeyEnvName && escapedApiKey
-    ? `Environment=${apiKeyEnvName}='${escapedApiKey}'`
+  // NOTE: kept only in systemd service file - NOT written to the log
+  const envLine = apiKeyEnvName && data.apiKey
+    ? `Environment=${apiKeyEnvName}=__DS_API_KEY__`
     : '';
 
   const agentsContent = `# Operating Instructions for ${agentName}
@@ -343,6 +373,26 @@ ${selectedSkills.length > 0 ? `\n## Pre-installed Skills\n${selectedSkills.map(i
 - Save important context to memory files
 - Follow the First Conversation Protocol in SOUL.md when meeting someone new
 `;
+
+  const escapedAgents = agentsContent.replace(/'/g, "'\\''");
+
+  // Build the API key injection line for systemd
+  // Security: we redirect output to /dev/null for this section so the key
+  // never appears in /var/log/deepsignal-bootstrap.log
+  const apiKeyInjection = apiKeyEnvName && data.apiKey
+    ? `
+# ── Inject API key into systemd service (output suppressed for security) ──────
+# Redirect output to /dev/null so the key is NOT written to the bootstrap log.
+# The key is only stored in the systemd service file, readable by root only.
+{
+  set +x
+  # Replace placeholder with actual key
+  sed -i 's|Environment=${apiKeyEnvName}=__DS_API_KEY__|Environment=${apiKeyEnvName}=${data.apiKey.replace(/'/g, "'\\''").replace(/\//g, '\\/')}|g' /etc/systemd/system/openclaw.service
+} > /dev/null 2>&1
+set -x
+systemctl daemon-reload
+`
+    : '';
 
   return `#!/bin/bash
 # Deep Signal Bootstrap - ${companyName}
@@ -385,12 +435,12 @@ EOFCONFIG
 
 echo "[DS] Writing SOUL.md..."
 cat > /root/.openclaw/SOUL.md << 'EOFSOUL'
-${soulContent}
+${escapedSoul}
 EOFSOUL
 
 echo "[DS] Writing AGENTS.md..."
 cat > /root/.openclaw/AGENTS.md << 'EOFAGENTS'
-${agentsContent}
+${escapedAgents}
 EOFAGENTS
 
 echo "[DS] Creating systemd service..."
@@ -413,7 +463,7 @@ StandardError=journal
 [Install]
 WantedBy=multi-user.target
 EOFSERVICE
-
+${apiKeyInjection}
 echo "[DS] Configuring Caddy..."
 cat > /etc/caddy/Caddyfile << 'EOFCADDY'
 ${domain} {
@@ -435,7 +485,7 @@ echo "[DS] Agent: ${agentName}"
 }
 
 // ── Cloudflare DNS ────────────────────────────────────────────────────────────
-async function createDnsRecord(subdomain: string, ip: string): Promise<{ success: boolean; error?: string }> {
+export async function createDnsRecord(subdomain: string, ip: string): Promise<{ success: boolean; error?: string }> {
   if (!CLOUDFLARE_API_TOKEN) {
     return { success: false, error: 'Cloudflare API token not configured' };
   }
@@ -500,12 +550,49 @@ async function createDnsRecord(subdomain: string, ip: string): Promise<{ success
   }
 }
 
+// ── Shared: get SSH key from Hetzner ─────────────────────────────────────────
+export async function getHetznerSshKeyId(): Promise<{ id: number | null; error?: string }> {
+  try {
+    const sshKeysRes = await fetch(`${HETZNER_API}/ssh_keys`, {
+      headers: { Authorization: `Bearer ${HETZNER_API_TOKEN}` },
+    });
+
+    if (!sshKeysRes.ok) {
+      const errorText = await sshKeysRes.text();
+      console.error('Hetzner SSH keys error:', sshKeysRes.status, errorText);
+      return { id: null, error: `Hetzner API error: ${sshKeysRes.status}. Check API token.` };
+    }
+
+    const sshKeysData = await sshKeysRes.json();
+    const id = sshKeysData.ssh_keys?.[0]?.id ?? null;
+    return { id };
+  } catch (fetchError: unknown) {
+    return {
+      id: null,
+      error: `Failed to connect to Hetzner: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}`,
+    };
+  }
+}
+
 // ── POST: Deploy instance ─────────────────────────────────────────────────────
 export async function POST(request: Request) {
   if (!HETZNER_API_TOKEN) {
     return NextResponse.json(
       { error: 'Hetzner API not configured. Add HETZNER_API_TOKEN to environment variables.', code: 'NO_API_KEY' },
       { status: 500 }
+    );
+  }
+
+  // Rate limiting
+  const ip =
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    request.headers.get('x-real-ip') ||
+    '127.0.0.1';
+
+  if (!checkRateLimit(ip)) {
+    return NextResponse.json(
+      { error: 'Too many deployments. Maximum 3 per hour per IP address. Please try again later.', code: 'RATE_LIMITED' },
+      { status: 429 }
     );
   }
 
@@ -536,28 +623,9 @@ export async function POST(request: Request) {
     const serverType = data.serverType || 'cpx21';
 
     // Get SSH key from Hetzner
-    let sshKeyId: number | null = null;
-    try {
-      const sshKeysRes = await fetch(`${HETZNER_API}/ssh_keys`, {
-        headers: { Authorization: `Bearer ${HETZNER_API_TOKEN}` },
-      });
-
-      if (!sshKeysRes.ok) {
-        const errorText = await sshKeysRes.text();
-        console.error('Hetzner SSH keys error:', sshKeysRes.status, errorText);
-        return NextResponse.json(
-          { error: `Hetzner API error: ${sshKeysRes.status}. Check API token.` },
-          { status: 500 }
-        );
-      }
-
-      const sshKeysData = await sshKeysRes.json();
-      sshKeyId = sshKeysData.ssh_keys?.[0]?.id;
-    } catch (fetchError: unknown) {
-      return NextResponse.json(
-        { error: `Failed to connect to Hetzner: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}` },
-        { status: 500 }
-      );
+    const { id: sshKeyId, error: sshError } = await getHetznerSshKeyId();
+    if (sshError) {
+      return NextResponse.json({ error: sshError }, { status: 500 });
     }
 
     if (!sshKeyId) {
@@ -567,7 +635,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const gatewayToken = `ds-${Date.now().toString(36)}`;
+    // Generate cryptographically secure gateway token
+    const gatewayToken = crypto.randomBytes(24).toString('hex');
+
     const cloudInit = generateCloudInit({ ...data, agentName, companyName }, domain, gatewayToken);
 
     // Create server
@@ -591,7 +661,8 @@ export async function POST(request: Request) {
             'managed-by': 'deep-signal',
             'agent': sanitizeLabel(agentName),
             'channel': sanitizeLabel(data.channel || 'web'),
-            'gateway-token': gatewayToken,
+            // Store token hash in label (not the token itself)
+            'gateway-token-hash': crypto.createHash('sha256').update(gatewayToken).digest('hex').substring(0, 16),
             'provider': sanitizeLabel(provider),
           },
         }),

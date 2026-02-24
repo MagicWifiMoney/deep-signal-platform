@@ -7,22 +7,22 @@ import { useSearchParams } from 'next/navigation';
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 interface FormData {
-  // Step 1: Who
+  // Step 0: Who
   forSelf: boolean;
   recipientName: string;
   recipientContext: string;
   setupPersonName: string;
-  // Step 2: Name
+  // Step 1: Name
   agentName: string;
   projectName: string;
-  // Step 3: Model
+  // Step 2: Model
   provider: 'free' | 'anthropic' | 'openai' | 'openrouter' | 'later';
   apiKey: string;
-  // Step 4: Vibe
+  // Step 3: Vibe
   vibe: 'professional' | 'friendly' | 'casual' | 'spicy';
-  // Step 5: Channels
+  // Step 4: Channels
   channels: string[];
-  // Step 6: Skills
+  // Step 5: Skills
   skills: string[];
 }
 
@@ -33,6 +33,15 @@ interface DeploymentStatus {
   domain: string;
   gatewayToken: string;
   dashboardUrl: string | null;
+}
+
+interface ReservedServer {
+  id: number;
+  hostname: string;
+  ip: string;
+  domain: string;
+  gatewayToken: string;
+  dashboardUrl: string;
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -151,6 +160,12 @@ const CHANNEL_OPTIONS = [
     emoji: '💬',
     name: 'Slack',
     description: 'For work. Drops right into your workspace.',
+  },
+  {
+    id: 'whatsapp',
+    emoji: '📱',
+    name: 'WhatsApp',
+    description: 'Chat from your phone. Link with QR code.',
   },
   {
     id: 'web',
@@ -296,7 +311,7 @@ function OnboardingContent() {
   const isGiftMode = searchParams.get('mode') === 'gift';
 
   const TOTAL_STEPS = 7;
-  const [step, setStep] = useState(isGiftMode ? 0 : 0);
+  const [step, setStep] = useState(0);
   const [showConfetti, setShowConfetti] = useState(false);
   const [isDeploying, setIsDeploying] = useState(false);
   const [deployStepIndex, setDeployStepIndex] = useState(0);
@@ -305,6 +320,10 @@ function OnboardingContent() {
   const [deployError, setDeployError] = useState<string | null>(null);
   const [deployDone, setDeployDone] = useState(false);
   const deployStepRef = useRef(0);
+
+  // Background provisioning state
+  const [reservedServer, setReservedServer] = useState<ReservedServer | null>(null);
+  const [reserveAttempted, setReserveAttempted] = useState(false);
 
   const [form, setForm] = useState<FormData>({
     forSelf: !isGiftMode,
@@ -347,6 +366,30 @@ function OnboardingContent() {
     return unused[Math.floor(Math.random() * unused.length)];
   };
 
+  // ── Background provisioning: fire when user moves from step 1 → 2 ────────
+  // We create the server early so it is already booting while the user
+  // finishes steps 2-5. Expected boot time is ~2 min; steps take ~1-2 min.
+
+  const fireReserve = async (agentName: string) => {
+    if (reserveAttempted || !agentName.trim()) return;
+    setReserveAttempted(true);
+    try {
+      const res = await fetch('/api/onboard/reserve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agentName }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.server) {
+          setReservedServer(data.server);
+        }
+      }
+    } catch {
+      // Silent fail - deploy flow will fall back to normal onboard endpoint
+    }
+  };
+
   // ── Deploy ────────────────────────────────────────────────────────────────
 
   const handleDeploy = async () => {
@@ -354,6 +397,7 @@ function OnboardingContent() {
     setDeployError(null);
     setDeployStepIndex(0);
     setDeployProgress(5);
+    deployStepRef.current = 0;
 
     // Animate through steps
     const animateSteps = () => {
@@ -371,53 +415,115 @@ function OnboardingContent() {
     const animInterval = animateSteps();
 
     try {
-      const res = await fetch('/api/onboard', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          // Map to API shape
-          companyName: form.projectName || form.agentName || 'Personal Agent',
-          agentName: form.agentName || 'Agent',
-          apiProvider: form.provider === 'anthropic' ? 'anthropic' : form.provider === 'openai' ? 'openai' : form.provider === 'openrouter' ? 'openrouter' : 'free',
-          apiKey: form.apiKey || '',
-          model: form.provider,
-          tone: form.vibe,
-          channel: form.channels[0] || 'web',
-          // Gift mode extras
-          giftMode: !form.forSelf,
-          recipientName: form.recipientName,
-          recipientContext: form.recipientContext,
-          setupPersonName: form.setupPersonName,
-          skills: form.skills,
-        }),
-      });
+      let instanceData: {
+        id: number;
+        hostname: string;
+        ip: string;
+        domain: string;
+        gatewayToken: string;
+        dashboardUrl: string | null;
+      };
+
+      if (reservedServer) {
+        // Fast path: server already booting from step 1 reserve
+        // Apply final config via configure endpoint
+        try {
+          const configRes = await fetch('/api/onboard/configure', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              domain: reservedServer.domain,
+              gatewayToken: reservedServer.gatewayToken,
+              agentName: form.agentName || 'Agent',
+              provider: form.provider,
+              apiKey: form.apiKey || '',
+              vibe: form.vibe,
+              skills: form.skills,
+              giftMode: !form.forSelf,
+              recipientName: form.recipientName,
+              recipientContext: form.recipientContext,
+              setupPersonName: form.setupPersonName,
+            }),
+          });
+
+          // configure is best-effort - even if it fails, use reserved server
+          if (!configRes.ok) {
+            console.warn('Configure failed, using reserved server with defaults');
+          }
+        } catch {
+          console.warn('Configure request failed, using reserved server with defaults');
+        }
+
+        instanceData = {
+          id: reservedServer.id,
+          hostname: reservedServer.hostname,
+          ip: reservedServer.ip,
+          domain: reservedServer.domain,
+          gatewayToken: reservedServer.gatewayToken,
+          dashboardUrl: reservedServer.dashboardUrl,
+        };
+      } else {
+        // Fallback: full onboard (user was fast, no reserved server yet)
+        const res = await fetch('/api/onboard', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            companyName: form.projectName || form.agentName || 'Personal Agent',
+            agentName: form.agentName || 'Agent',
+            apiProvider: form.provider === 'anthropic' ? 'anthropic' : form.provider === 'openai' ? 'openai' : form.provider === 'openrouter' ? 'openrouter' : 'free',
+            apiKey: form.apiKey || '',
+            model: form.provider,
+            tone: form.vibe,
+            channel: form.channels[0] || 'web',
+            giftMode: !form.forSelf,
+            recipientName: form.recipientName,
+            recipientContext: form.recipientContext,
+            setupPersonName: form.setupPersonName,
+            skills: form.skills,
+          }),
+        });
+
+        const text = await res.text();
+        if (!text) throw new Error('Server returned empty response');
+        const data = JSON.parse(text);
+        if (!res.ok) throw new Error(data.error || 'Deployment failed');
+
+        instanceData = {
+          id: data.instance.id,
+          hostname: data.instance.hostname,
+          ip: data.instance.ip,
+          domain: data.instance.domain,
+          gatewayToken: data.instance.gatewayToken,
+          dashboardUrl: data.instance.dashboardUrl,
+        };
+      }
 
       clearInterval(animInterval);
-
-      const text = await res.text();
-      if (!text) throw new Error('Server returned empty response');
-      const data = JSON.parse(text);
-      if (!res.ok) throw new Error(data.error || 'Deployment failed');
-
       setDeployProgress(95);
       setDeployStepIndex(DEPLOY_STEPS.length - 1);
 
-      setDeployment({
-        id: data.instance.id,
-        hostname: data.instance.hostname,
-        ip: data.instance.ip,
-        domain: data.instance.domain,
-        gatewayToken: data.instance.gatewayToken,
-        dashboardUrl: data.instance.dashboardUrl,
-      });
+      setDeployment(instanceData);
 
       // Poll until ready
-      pollStatus(data.instance.id, data.instance.domain);
-    } catch (err: any) {
+      pollStatus(instanceData.id, instanceData.domain);
+    } catch (err: unknown) {
       clearInterval(animInterval);
-      setDeployError(err.message);
+      setDeployError(err instanceof Error ? err.message : 'Deployment failed');
       setIsDeploying(false);
     }
+  };
+
+  const retryDeploy = () => {
+    setDeployError(null);
+    handleDeploy();
+  };
+
+  const switchToFreeTier = () => {
+    setDeployError(null);
+    update('provider', 'free');
+    update('apiKey', '');
+    // Give state a tick to update then deploy
+    setTimeout(() => handleDeploy(), 100);
   };
 
   const pollStatus = async (serverId: number, domain: string) => {
@@ -550,7 +656,7 @@ function OnboardingContent() {
           <div className="max-w-lg mx-auto">
             <h2 className="text-3xl font-bold text-white mb-2">Name your agent</h2>
             <p className="text-slate-400 mb-8">
-              This is what they'll call themselves. Make it personal.
+              This is what they will call themselves. Make it personal.
             </p>
 
             <div className="space-y-6">
@@ -630,6 +736,16 @@ function OnboardingContent() {
                   placeholder="e.g. Acme Inc, Side Project..."
                 />
               </div>
+
+              {/* Background provisioning hint */}
+              {reservedServer && (
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
+                  <p className="text-xs text-emerald-300">
+                    Server reserved and booting for {form.agentName}. Deploy will be faster!
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         );
@@ -809,7 +925,11 @@ function OnboardingContent() {
               Skills teach {form.agentName || 'your agent'} how to use tools. Select what sounds useful.
             </p>
             <p className="text-sm text-slate-500 mb-8">
-              You can always add more later from <a href="https://clawhub.com" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline">ClawHub</a> or by telling your agent to install one.
+              You can always add more later from{' '}
+              <a href="https://clawhub.com" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline">
+                ClawHub
+              </a>{' '}
+              or by telling your agent to install one.
             </p>
 
             <div className="space-y-8">
@@ -872,7 +992,9 @@ function OnboardingContent() {
               </span>
               <button
                 onClick={() => {
-                  const allIds = SKILL_CATEGORIES.flatMap(c => c.skills.filter(s => 'popular' in s && s.popular).map(s => s.id));
+                  const allIds = SKILL_CATEGORIES.flatMap(c =>
+                    c.skills.filter(s => 'popular' in s && s.popular).map(s => s.id)
+                  );
                   update('skills', allIds);
                 }}
                 className="text-xs text-cyan-400 hover:text-cyan-300 font-medium transition-colors"
@@ -983,9 +1105,13 @@ function OnboardingContent() {
                 </svg>
               </div>
 
-              <h2 className="text-3xl font-bold text-white mb-3">Launching...</h2>
+              <h2 className="text-3xl font-bold text-white mb-3">
+                {reservedServer ? 'Configuring your agent...' : 'Launching...'}
+              </h2>
               <p className="text-slate-400 mb-10 text-lg">
-                Grab a coffee - this takes about 2 minutes.
+                {reservedServer
+                  ? 'Your server was already booting - almost there.'
+                  : 'Grab a coffee - this takes about 2 minutes.'}
               </p>
 
               {/* Current step */}
@@ -1042,6 +1168,12 @@ function OnboardingContent() {
         }
 
         // Pre-deploy: review screen
+        const isApiKeyError = deployError && (
+          deployError.toLowerCase().includes('api key') ||
+          deployError.toLowerCase().includes('key required') ||
+          deployError.toLowerCase().includes('unauthorized')
+        );
+
         return (
           <div className="max-w-lg mx-auto">
             <div className="text-center mb-8">
@@ -1084,6 +1216,15 @@ function OnboardingContent() {
                   <span className="text-cyan-300 font-medium">{form.recipientName || 'friend'} 🎁</span>
                 </div>
               )}
+              {reservedServer && (
+                <div className="flex items-center justify-between p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                  <span className="text-slate-400">Server</span>
+                  <span className="text-emerald-400 text-sm flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block" />
+                    Already booting
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Server spec */}
@@ -1098,19 +1239,51 @@ function OnboardingContent() {
               </div>
             </div>
 
+            {/* Error recovery */}
             {deployError && (
-              <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 mb-6">
-                <div className="text-rose-400 font-medium mb-1">Deployment Error</div>
-                <p className="text-sm text-slate-400">{deployError}</p>
+              <div className="p-5 rounded-xl bg-rose-500/10 border border-rose-500/30 mb-6">
+                <div className="flex items-start gap-3 mb-4">
+                  <span className="text-rose-400 text-xl flex-shrink-0">⚠️</span>
+                  <div>
+                    <div className="text-rose-400 font-semibold mb-1">Deployment failed</div>
+                    <p className="text-sm text-slate-300 leading-relaxed">{deployError}</p>
+                  </div>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <button
+                    onClick={retryDeploy}
+                    className="flex-1 px-4 py-2.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 font-medium text-sm transition-colors"
+                  >
+                    Try Again
+                  </button>
+                  {isApiKeyError && (
+                    <button
+                      onClick={switchToFreeTier}
+                      className="flex-1 px-4 py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-200 font-medium text-sm transition-colors"
+                    >
+                      Start with Free Tier
+                    </button>
+                  )}
+                </div>
+                <div className="mt-3 text-center">
+                  <a
+                    href="mailto:support@deepsignal.ai"
+                    className="text-xs text-slate-500 hover:text-cyan-400 transition-colors"
+                  >
+                    Need help? Contact support
+                  </a>
+                </div>
               </div>
             )}
 
-            <button
-              onClick={handleDeploy}
-              className="w-full py-5 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold text-xl hover:shadow-2xl hover:shadow-cyan-500/25 transition-all"
-            >
-              Deploy My Agent 🚀
-            </button>
+            {!deployError && (
+              <button
+                onClick={handleDeploy}
+                className="w-full py-5 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold text-xl hover:shadow-2xl hover:shadow-cyan-500/25 transition-all"
+              >
+                {reservedServer ? 'Configure and Go Live 🚀' : 'Deploy My Agent 🚀'}
+              </button>
+            )}
           </div>
         );
 
@@ -1142,6 +1315,14 @@ function OnboardingContent() {
 
   const isLastStep = step === TOTAL_STEPS - 1;
 
+  const handleNext = () => {
+    // Fire background reserve when leaving step 1 (name entry)
+    if (step === 1 && form.agentName.trim()) {
+      fireReserve(form.agentName.trim());
+    }
+    setStep((s) => s + 1);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
       {/* Background blobs */}
@@ -1149,6 +1330,17 @@ function OnboardingContent() {
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl" />
         <div className="absolute bottom-0 -left-40 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
       </div>
+
+      {/* Step transition keyframes */}
+      <style>{`
+        @keyframes fadeSlideIn {
+          from { opacity: 0; transform: translateY(12px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .step-enter {
+          animation: fadeSlideIn 0.3s ease-out;
+        }
+      `}</style>
 
       {/* Header */}
       <header className="relative z-10 flex items-center justify-between px-6 py-5 border-b border-slate-800/60">
@@ -1168,9 +1360,11 @@ function OnboardingContent() {
         </div>
       </header>
 
-      {/* Content */}
+      {/* Content - key changes with step to trigger fade-in animation */}
       <main className="relative z-10 px-6 py-12 min-h-[calc(100vh-80px-88px)]">
-        {renderStep()}
+        <div key={step} className="step-enter">
+          {renderStep()}
+        </div>
       </main>
 
       {/* Navigation footer - hidden during deploy */}
@@ -1182,7 +1376,7 @@ function OnboardingContent() {
                 onClick={() => setStep((s) => s - 1)}
                 className="px-6 py-3 rounded-xl bg-slate-800/60 border border-slate-700 text-white font-medium hover:bg-slate-800 transition-colors min-h-[48px]"
               >
-                ← Back
+                Back
               </button>
             ) : (
               <div />
@@ -1190,11 +1384,11 @@ function OnboardingContent() {
 
             {!isLastStep && (
               <button
-                onClick={() => setStep((s) => s + 1)}
+                onClick={handleNext}
                 disabled={!canProceed()}
                 className="px-8 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-semibold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed min-h-[48px]"
               >
-                Continue →
+                Continue
               </button>
             )}
           </div>
