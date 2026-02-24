@@ -201,7 +201,10 @@ function OverviewDashboard() {
                     </span>
 
                     <a
-                      href={`https://${inst.domain}/#token=${inst.gatewayToken}`}
+                      href={inst.gatewayToken
+                        ? `https://${inst.domain}/#token=${inst.gatewayToken}`
+                        : `https://${inst.domain}`
+                      }
                       target="_blank"
                       rel="noopener noreferrer"
                       className="px-4 py-2 min-h-[44px] flex items-center rounded-lg bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 text-sm font-medium hover:bg-cyan-500/30 transition-colors"

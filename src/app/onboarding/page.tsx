@@ -334,7 +334,7 @@ export default function Onboarding() {
         openclawReady: false,
       });
 
-      pollDeploymentStatus(data.instance.id);
+      pollDeploymentStatus(data.instance.id, data.instance.domain);
     } catch (error: any) {
       setDeployError(error.message);
       setIsDeploying(false);
@@ -342,7 +342,7 @@ export default function Onboarding() {
   };
 
   // Poll for deployment status
-  const pollDeploymentStatus = async (serverId: number) => {
+  const pollDeploymentStatus = async (serverId: number, domain?: string) => {
     let attempts = 0;
     const maxAttempts = 60;
 
@@ -350,7 +350,7 @@ export default function Onboarding() {
       attempts++;
       
       try {
-        const res = await fetch(`/api/onboard?id=${serverId}`);
+        const res = await fetch(`/api/onboard?id=${serverId}${domain ? `&domain=${encodeURIComponent(domain)}` : ''}`);
         const text = await res.text();
         
         if (!text) {

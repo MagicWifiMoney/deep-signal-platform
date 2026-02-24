@@ -73,8 +73,7 @@ function generateCloudInit(data: OnboardingData, domain: string, token: string):
       port: 3000,
       auth: {
         token: token
-      },
-      deviceAuth: 'open'
+      }
     },
     commands: {
       restart: true
@@ -355,6 +354,7 @@ export async function POST(request: Request) {
             'client': sanitizeLabel(data.companyName),
             'industry': sanitizeLabel(data.industry || 'unknown'),
             'channel': sanitizeLabel(data.channel || 'web'),
+            'gateway-token': gatewayToken,
           },
         }),
       });
@@ -431,6 +431,7 @@ export async function POST(request: Request) {
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const serverId = searchParams.get('id');
+  const domainParam = searchParams.get('domain'); // Accept domain from client for reliable health check
 
   if (!serverId || !HETZNER_API_TOKEN) {
     return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
@@ -447,22 +448,38 @@ export async function GET(request: Request) {
 
     const data = await res.json();
     const server = data.server;
+    const ip = server.public_net?.ipv4?.ip;
 
-    // Try to check if OpenClaw is responding (check the HTTPS URL)
-    let openclawReady = false;
+    // Use domain from client param (most reliable) or reconstruct from labels
     const clientLabel = server.labels?.client;
-    const domain = clientLabel ? `${clientLabel}.${DOMAIN_SUFFIX}` : null;
+    const domain = domainParam || (clientLabel ? `${clientLabel}.${DOMAIN_SUFFIX}` : null);
     
-    if (server.status === 'running' && domain) {
+    // Check if OpenClaw is responding - try IP directly first (faster, no DNS dependency)
+    let openclawReady = false;
+    
+    if (server.status === 'running' && ip) {
       try {
         const controller = new AbortController();
         setTimeout(() => controller.abort(), 5000);
-        const healthCheck = await fetch(`https://${domain}`, {
+        // Check via IP first - avoids DNS propagation delays
+        const healthCheck = await fetch(`http://${ip}:3000/`, {
           signal: controller.signal,
         });
         openclawReady = healthCheck.ok;
       } catch {
-        openclawReady = false;
+        // Fall back to domain check
+        if (domain) {
+          try {
+            const controller2 = new AbortController();
+            setTimeout(() => controller2.abort(), 5000);
+            const healthCheck2 = await fetch(`https://${domain}`, {
+              signal: controller2.signal,
+            });
+            openclawReady = healthCheck2.ok;
+          } catch {
+            openclawReady = false;
+          }
+        }
       }
     }
 
@@ -470,10 +487,10 @@ export async function GET(request: Request) {
       id: server.id,
       name: server.name,
       status: server.status,
-      ip: server.public_net?.ipv4?.ip,
+      ip,
       domain: domain,
       openclawReady,
-      dashboardUrl: openclawReady ? `https://${domain}` : null,
+      dashboardUrl: domain ? `https://${domain}` : (ip ? `http://${ip}:3000` : null),
     });
   } catch (error) {
     return NextResponse.json({ error: 'Failed to check status' }, { status: 500 });
