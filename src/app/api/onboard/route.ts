@@ -75,7 +75,9 @@ function generateCloudInit(data: OnboardingData, domain: string, token: string):
         token: token
       },
       controlUi: {
-        dangerouslyAllowHostHeaderOriginFallback: true
+        dangerouslyAllowHostHeaderOriginFallback: true,
+        dangerouslyDisableDeviceAuth: true,
+        allowInsecureAuth: true
       }
     },
     commands: {
@@ -459,7 +461,7 @@ export async function POST(request: Request) {
         domain: domain,
         status: 'provisioning',
         dashboardUrl: `https://${domain}`,
-        fallbackUrl: serverIp ? `http://${serverIp}:3000` : null,
+        fallbackUrl: null, // HTTP doesn't support device auth - HTTPS only
         estimatedReadyTime: '2-3 minutes',
         dnsConfigured: dnsResult.success,
         gatewayToken: gatewayToken,

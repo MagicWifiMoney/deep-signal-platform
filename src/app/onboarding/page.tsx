@@ -180,20 +180,7 @@ function InstanceReadyChecker({ domain, token, ip }: { domain: string; token: st
         </div>
       )}
 
-      {/* IP fallback */}
-      {ipUrl && (
-        <div className="text-center">
-          <p className="text-xs text-slate-500 mb-1">Direct IP fallback (bypasses DNS):</p>
-          <a
-            href={ipUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-cyan-500/70 hover:text-cyan-400 font-mono transition-colors"
-          >
-            {ipUrl}
-          </a>
-        </div>
-      )}
+      {/* IP fallback removed - HTTP doesn't support device auth */}
     </div>
   );
 }
