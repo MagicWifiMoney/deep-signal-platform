@@ -1,8 +1,8 @@
 'use client';
 
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 
 const CHANNEL_GUIDES: Record<string, {
   name: string;
@@ -314,13 +314,53 @@ IMAP: outlook.office365.com:993`,
   },
 };
 
-export default function ChannelSetup() {
+function ChannelSetupInner() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const channelId = params.channel as string;
   const guide = CHANNEL_GUIDES[channelId];
   const [currentStep, setCurrentStep] = useState(0);
   const [config, setConfig] = useState<Record<string, string>>({});
   const [copied, setCopied] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveResult, setSaveResult] = useState<{ ok: boolean; message: string } | null>(null);
+
+  // Get instance details from URL params
+  const domain = searchParams.get('domain') || '';
+  const token = searchParams.get('token') || '';
+  const agentName = searchParams.get('name') || 'your agent';
+
+  const handleSave = async () => {
+    if (!domain) {
+      setSaveResult({ ok: false, message: 'Missing instance domain. Go back to onboarding and try again.' });
+      return;
+    }
+    setSaving(true);
+    setSaveResult(null);
+    try {
+      const endpoint = channelId === 'telegram' ? '/api/channels/configure' : '/api/channels/configure';
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          domain,
+          gatewayToken: token,
+          channel: channelId,
+          config: config,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSaveResult({ ok: true, message: `${guide.name} connected! Open your agent to start chatting.` });
+      } else {
+        setSaveResult({ ok: false, message: data.error || 'Failed to save configuration' });
+      }
+    } catch {
+      setSaveResult({ ok: false, message: 'Network error - check your connection and try again.' });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   if (!guide) {
     return (
@@ -463,8 +503,22 @@ export default function ChannelSetup() {
             ))}
           </div>
           
-          <button className="w-full mt-6 px-6 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-medium hover:shadow-lg hover:shadow-cyan-500/25 transition-all">
-            Save Configuration
+          {saveResult && (
+            <div className={`mt-4 p-4 rounded-xl border text-sm ${
+              saveResult.ok
+                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+            }`}>
+              {saveResult.ok ? '✅' : '⚠️'} {saveResult.message}
+            </div>
+          )}
+
+          <button
+            onClick={handleSave}
+            disabled={saving || !Object.values(config).some(v => v.trim())}
+            className="w-full mt-6 px-6 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-medium hover:shadow-lg hover:shadow-cyan-500/25 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {saving ? 'Connecting...' : saveResult?.ok ? '✅ Connected!' : 'Connect ' + guide.name}
           </button>
         </div>
 
@@ -474,5 +528,17 @@ export default function ChannelSetup() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ChannelSetup() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <ChannelSetupInner />
+    </Suspense>
   );
 }
