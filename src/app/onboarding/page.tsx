@@ -1278,7 +1278,7 @@ function OnboardingContent() {
               {/* Share buttons */}
               <div className="flex gap-3 mt-6">
                 <a
-                  href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`Just deployed my own AI agent${form.agentName ? ` named ${form.agentName}` : ''} with Deep Signal - it took like 2 minutes 🤯`)}&url=${encodeURIComponent(agentUrl)}`}
+                  href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`Just deployed my own AI agent${form.agentName ? ` named ${form.agentName}` : ''} with Deep Signal - it took like 2 minutes 🤯`)}&url=${encodeURIComponent(`https://${deployment.domain}`)}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-medium text-sm transition-all"
@@ -1312,6 +1312,43 @@ function OnboardingContent() {
                   {linkCopied ? 'Copied!' : 'Copy link'}
                 </button>
               </div>
+
+              {/* Save credentials */}
+              <button
+                onClick={() => {
+                  const credsText = [
+                    `# ${form.agentName || 'My Agent'} - Access Credentials`,
+                    `# Generated: ${new Date().toISOString()}`,
+                    `# Keep this file private - it contains your gateway token!`,
+                    ``,
+                    `Agent Name:    ${form.agentName || 'My Agent'}`,
+                    `Dashboard URL: https://${deployment.domain}`,
+                    `IP Address:    ${deployment.ip}`,
+                    `Gateway Token: ${deployment.gatewayToken}`,
+                    ``,
+                    `# Your access link (includes token for auto-login):`,
+                    `${agentUrl}`,
+                    ``,
+                    `# To reconnect later:`,
+                    `# 1. Open the Dashboard URL above`,
+                    `# 2. Enter your Gateway Token when prompted`,
+                    `# Or just bookmark your access link above.`,
+                  ].join('\n');
+                  const blob = new Blob([credsText], { type: 'text/plain' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `${(form.agentName || 'agent').toLowerCase().replace(/\s+/g, '-')}-credentials.txt`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                className="w-full mt-3 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 font-medium text-sm transition-all"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Save credentials (don&apos;t lose your token)
+              </button>
             </div>
           );
         }
