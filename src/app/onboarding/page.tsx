@@ -1298,8 +1298,8 @@ function OnboardingContent() {
       // ─ Step 7: Deploy ───────────────────────────────────────────────────
       case 7:
         if (deployDone && deployment) {
-          const agentUrl = `https://${deployment.domain}/#token=${deployment.gatewayToken}`;
-          const directUrl = agentUrl;
+          const agentUrl = `/chat?domain=${encodeURIComponent(deployment.domain)}&token=${encodeURIComponent(deployment.gatewayToken)}&name=${encodeURIComponent(form.agentName)}`;
+          const directUrl = `https://${deployment.domain}/#token=${deployment.gatewayToken}`;
           const shareUrl = `https://deep-signal-platform.vercel.app/share?name=${encodeURIComponent(form.agentName)}&from=${encodeURIComponent(form.setupPersonName)}&url=${encodeURIComponent(directUrl)}`;
           const telegramSetupUrl = `/setup/telegram?domain=${encodeURIComponent(deployment.domain)}&token=${encodeURIComponent(deployment.gatewayToken)}&name=${encodeURIComponent(form.agentName)}`;
 
