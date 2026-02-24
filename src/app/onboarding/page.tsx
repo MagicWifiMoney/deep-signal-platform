@@ -504,6 +504,27 @@ function OnboardingContent() {
   const [deployment, setDeployment] = useState<DeploymentStatus | null>(null);
   const [deployError, setDeployError] = useState<string | null>(null);
   const [deployDone, setDeployDone] = useState(false);
+  const [instanceReady, setInstanceReady] = useState(false);
+
+  // Poll instance readiness after deploy
+  useEffect(() => {
+    if (!deployDone || !deployment?.domain) return;
+    let cancelled = false;
+    const url = `https://${deployment.domain}/`;
+    const poll = async () => {
+      for (let i = 0; i < 60; i++) {
+        if (cancelled) return;
+        try {
+          await fetch(url, { mode: 'no-cors', signal: AbortSignal.timeout(5000) });
+          if (!cancelled) setInstanceReady(true);
+          return;
+        } catch { /* not ready yet */ }
+        await new Promise(r => setTimeout(r, 5000));
+      }
+    };
+    poll();
+    return () => { cancelled = true; };
+  }, [deployDone, deployment?.domain]);
   const [isCapacityError, setIsCapacityError] = useState(false);
   const [waitlistEmail, setWaitlistEmail] = useState('');
   const [waitlistSubmitted, setWaitlistSubmitted] = useState(false);
@@ -1277,8 +1298,8 @@ function OnboardingContent() {
       // ─ Step 7: Deploy ───────────────────────────────────────────────────
       case 7:
         if (deployDone && deployment) {
-          const agentUrl = `/chat?domain=${encodeURIComponent(deployment.domain)}&token=${encodeURIComponent(deployment.gatewayToken)}&name=${encodeURIComponent(form.agentName)}${deployment.ip ? `&ip=${encodeURIComponent(deployment.ip)}` : ''}`;
-          const directUrl = `https://${deployment.domain}/#token=${deployment.gatewayToken}`;
+          const agentUrl = `https://${deployment.domain}/#token=${deployment.gatewayToken}`;
+          const directUrl = agentUrl;
           const shareUrl = `https://deep-signal-platform.vercel.app/share?name=${encodeURIComponent(form.agentName)}&from=${encodeURIComponent(form.setupPersonName)}&url=${encodeURIComponent(directUrl)}`;
           const telegramSetupUrl = `/setup/telegram?domain=${encodeURIComponent(deployment.domain)}&token=${encodeURIComponent(deployment.gatewayToken)}&name=${encodeURIComponent(form.agentName)}`;
 
@@ -1296,34 +1317,59 @@ function OnboardingContent() {
                 <h2 className="text-3xl font-bold text-white mb-2">
                   {form.agentName || 'Your agent'} is live!
                 </h2>
-                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse inline-block flex-shrink-0" />
-                  Booting up (~2 min) - chat opens when ready
-                </div>
+                {instanceReady ? (
+                  <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-sm">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block flex-shrink-0" />
+                    Ready to chat!
+                  </div>
+                ) : (
+                  <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse inline-block flex-shrink-0" />
+                    Booting up (~2 min)...
+                  </div>
+                )}
               </div>
 
               {/* PRIMARY CTA - Chat with Your Agent */}
-              <a
-                href={agentUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group block w-full mb-8"
-              >
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-emerald-500 to-green-600 p-px shadow-2xl shadow-emerald-500/30 hover:shadow-emerald-500/50 transition-all">
-                  <div className="rounded-2xl bg-gradient-to-r from-emerald-500 to-green-600 px-6 py-5 flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                      <div className="w-14 h-14 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
-                        <span className="text-3xl">💬</span>
+              {instanceReady ? (
+                <a
+                  href={agentUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group block w-full mb-8"
+                >
+                  <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-emerald-500 to-green-600 p-px shadow-2xl shadow-emerald-500/30 hover:shadow-emerald-500/50 transition-all">
+                    <div className="rounded-2xl bg-gradient-to-r from-emerald-500 to-green-600 px-6 py-5 flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-4">
+                        <div className="w-14 h-14 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
+                          <span className="text-3xl">💬</span>
+                        </div>
+                        <div>
+                          <div className="text-xl font-bold text-white">Chat with {form.agentName || 'Your Agent'}</div>
+                          <div className="text-emerald-100 text-sm mt-0.5">Your agent is ready!</div>
+                        </div>
                       </div>
-                      <div>
-                        <div className="text-xl font-bold text-white">Chat with {form.agentName || 'Your Agent'}</div>
-                        <div className="text-emerald-100 text-sm mt-0.5">Open your web chat - it&apos;ll be ready in ~2 min</div>
+                      <span className="text-white text-2xl transition-transform group-hover:translate-x-1 flex-shrink-0">→</span>
+                    </div>
+                  </div>
+                </a>
+              ) : (
+                <div className="block w-full mb-8 cursor-not-allowed">
+                  <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-600 to-slate-700 p-px shadow-xl">
+                    <div className="rounded-2xl bg-gradient-to-r from-slate-600 to-slate-700 px-6 py-5 flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-4">
+                        <div className="w-14 h-14 rounded-xl bg-white/10 flex items-center justify-center flex-shrink-0">
+                          <div className="w-6 h-6 border-2 border-white/40 border-t-transparent rounded-full animate-spin" />
+                        </div>
+                        <div>
+                          <div className="text-xl font-bold text-white/60">Setting up your agent...</div>
+                          <div className="text-slate-400 text-sm mt-0.5">This usually takes about 2 minutes</div>
+                        </div>
                       </div>
                     </div>
-                    <span className="text-white text-2xl transition-transform group-hover:translate-x-1 flex-shrink-0">→</span>
                   </div>
                 </div>
-              </a>
+              )}
 
               {/* Gift mode share */}
               {!form.forSelf && (
