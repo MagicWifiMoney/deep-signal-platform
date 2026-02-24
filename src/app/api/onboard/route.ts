@@ -311,6 +311,15 @@ export function generateCloudInit(data: OnboardingData, domain: string, token: s
     skillMap[name] = { enabled: true };
   }
 
+  // Determine the effective API key for config injection
+  const effectiveApiKeyForConfig = data.apiKey || (provider === 'free' || provider === 'later' ? process.env.GEMINI_API_KEY || '' : '');
+
+  // Build env object for openclaw.json
+  const envConfig: Record<string, string> = {};
+  if (apiKeyEnvName && effectiveApiKeyForConfig) {
+    envConfig[apiKeyEnvName] = effectiveApiKeyForConfig;
+  }
+
   // Build OpenClaw config JSON - MUST include these exact keys for remote access
   const openclawConfig = JSON.stringify({
     agents: {
@@ -333,6 +342,7 @@ export function generateCloudInit(data: OnboardingData, domain: string, token: s
         allowInsecureAuth: true,
       },
     },
+    env: envConfig,
     skills: {
       entries: skillMap,
     },
