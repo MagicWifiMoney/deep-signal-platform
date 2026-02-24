@@ -433,7 +433,25 @@ function OnboardingContent() {
   const isGiftMode = searchParams.get('mode') === 'gift';
 
   const TOTAL_STEPS = 8;
-  const [step, setStep] = useState(0);
+  const STORAGE_KEY = 'deep-signal-onboarding';
+
+  // Restore saved progress from localStorage
+  const getSavedState = () => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      const saved = JSON.parse(raw);
+      // Don't restore if deploy was already in progress or done
+      if (saved.step >= TOTAL_STEPS - 1) return null;
+      return saved as { step: number; form: FormData };
+    } catch {
+      return null;
+    }
+  };
+
+  const saved = getSavedState();
+  const [step, setStep] = useState(saved?.step ?? 0);
   const [showConfetti, setShowConfetti] = useState(false);
   const [isDeploying, setIsDeploying] = useState(false);
   const [deployStepIndex, setDeployStepIndex] = useState(0);
@@ -442,12 +460,13 @@ function OnboardingContent() {
   const [deployError, setDeployError] = useState<string | null>(null);
   const [deployDone, setDeployDone] = useState(false);
   const deployStepRef = useRef(0);
+  const [showResumedBanner, setShowResumedBanner] = useState(!!saved);
 
   // Background provisioning state
   const [reservedServer, setReservedServer] = useState<ReservedServer | null>(null);
   const [reserveAttempted, setReserveAttempted] = useState(false);
 
-  const [form, setForm] = useState<FormData>({
+  const defaultForm: FormData = {
     forSelf: !isGiftMode,
     recipientName: '',
     recipientContext: '',
@@ -460,7 +479,32 @@ function OnboardingContent() {
     channels: ['web'],
     skills: ['weather', 'web-search', 'deep-research'],
     config: null,
-  });
+  };
+
+  const [form, setForm] = useState<FormData>(saved?.form ?? defaultForm);
+
+  // Persist progress to localStorage on every change
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    // Don't save deploy/success steps
+    if (step >= TOTAL_STEPS - 1 || isDeploying || deployDone) {
+      localStorage.removeItem(STORAGE_KEY);
+      return;
+    }
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ step, form }));
+    } catch {
+      // Storage full or blocked - no big deal
+    }
+  }, [step, form, isDeploying, deployDone]);
+
+  // Auto-dismiss the resumed banner
+  useEffect(() => {
+    if (showResumedBanner) {
+      const t = setTimeout(() => setShowResumedBanner(false), 4000);
+      return () => clearTimeout(t);
+    }
+  }, [showResumedBanner]);
 
   const update = (key: keyof FormData, value: FormData[keyof FormData]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -1512,6 +1556,24 @@ function OnboardingContent() {
           {step + 1} / {TOTAL_STEPS}
         </div>
       </header>
+
+      {/* Resumed banner */}
+      {showResumedBanner && (
+        <div className="relative z-20 mx-auto max-w-xl mt-4 px-4 py-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-center text-sm text-cyan-300 animate-pulse">
+          Picked up where you left off ✨
+          <button
+            onClick={() => {
+              localStorage.removeItem(STORAGE_KEY);
+              setStep(0);
+              setForm(defaultForm);
+              setShowResumedBanner(false);
+            }}
+            className="ml-3 text-cyan-400 underline hover:text-cyan-200"
+          >
+            Start over
+          </button>
+        </div>
+      )}
 
       {/* Content - key changes with step to trigger fade-in animation */}
       <main className="relative z-10 px-6 py-12 min-h-[calc(100vh-80px-88px)]">
