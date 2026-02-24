@@ -454,6 +454,7 @@ function OnboardingContent() {
   const [step, setStep] = useState(saved?.step ?? 0);
   const [showConfetti, setShowConfetti] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [copiedStarter, setCopiedStarter] = useState<number | null>(null);
   const [isDeploying, setIsDeploying] = useState(false);
   const [deployStepIndex, setDeployStepIndex] = useState(0);
   const [deployProgress, setDeployProgress] = useState(0);
@@ -1272,6 +1273,38 @@ function OnboardingContent() {
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block" />
                     Live
                   </span>
+                </div>
+              </div>
+
+              {/* Conversation Starters */}
+              <div className="mt-6">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
+                  Say something to get started 👇
+                </p>
+                <div className="space-y-2">
+                  {[
+                    { emoji: '👋', text: `Introduce yourself and show me the most impressive thing you can do right now.` },
+                    { emoji: '🔍', text: `Search the web and give me the top 3 AI news stories today.` },
+                    { emoji: '⚡', text: `What's one thing you can automate or help me with right now?` },
+                  ].map((starter, i) => (
+                    <button
+                      key={i}
+                      onClick={() => {
+                        navigator.clipboard?.writeText(starter.text);
+                        setCopiedStarter(i);
+                        setTimeout(() => setCopiedStarter(null), 2000);
+                        window.open(agentUrl, '_blank');
+                      }}
+                      className={`w-full text-left flex items-start gap-3 px-4 py-3 rounded-xl border transition-all text-sm ${
+                        copiedStarter === i
+                          ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
+                          : 'bg-slate-800/40 border-slate-700/60 text-slate-300 hover:bg-slate-700/60 hover:border-slate-600 hover:text-white'
+                      }`}
+                    >
+                      <span className="flex-shrink-0 mt-0.5">{copiedStarter === i ? '✓' : starter.emoji}</span>
+                      <span className="flex-1">{copiedStarter === i ? 'Copied! Paste it in your agent →' : starter.text}</span>
+                    </button>
+                  ))}
                 </div>
               </div>
 
