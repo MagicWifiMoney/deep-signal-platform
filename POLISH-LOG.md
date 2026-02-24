@@ -73,3 +73,21 @@
 - No new dependencies
 
 **Commit:** 1a827ca
+
+## 2026-02-24 08:00 - Animated Chat Preview on Landing Page
+
+**What:** Added a live animated chat preview to the landing page hero section. It cycles through 3 demo conversations showing realistic agent interactions - calendar management, inbox triage, Slack catch-up. Agent messages type out character by character with a cursor, user messages pop in naturally, and there's a typing indicator between turns.
+
+**Why:** "Show, don't tell" is the #1 conversion principle. The hero had a strong headline but nothing showing the product in action. Now visitors see exactly what chatting with their agent looks like before they even click Deploy. The conversations demonstrate real utility (not generic "how can I help you?" stuff) - killing AWS instances, forwarding leads, approving blog posts. That is the "holy shit" moment.
+
+**Details:**
+- 3 conversation scripts that rotate every ~4 seconds after completion
+- Character-by-character typing at ~20ms/char with slight randomness for realism
+- Bouncing dot typing indicator before agent replies
+- Fake browser chrome (traffic lights + domain + green live dot)
+- Auto-scrolls as messages appear
+- 220px fixed height so layout doesn't jump
+- Mobile responsive (max-w-lg, 85% max bubble width)
+- No external dependencies - pure React state machine
+
+**Commit:** 315122c

@@ -1618,12 +1618,31 @@ function OnboardingContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, isDeploying, deployDone, form]);
 
+  // Background blobs shift color as user progresses - gives subconscious sense of journey
+  const stepGlow: [string, string][] = [
+    ['rgba(6,182,212,0.10)',  'rgba(59,130,246,0.10)'],  // 0: cyan / blue
+    ['rgba(99,102,241,0.10)', 'rgba(79,70,229,0.10)'],   // 1: indigo
+    ['rgba(59,130,246,0.10)', 'rgba(99,102,241,0.10)'],   // 2: blue / indigo
+    ['rgba(99,102,241,0.10)', 'rgba(139,92,246,0.10)'],   // 3: indigo / violet
+    ['rgba(139,92,246,0.10)', 'rgba(168,85,247,0.10)'],   // 4: violet / purple
+    ['rgba(168,85,247,0.10)', 'rgba(217,70,239,0.10)'],   // 5: purple / fuchsia
+    ['rgba(217,70,239,0.10)', 'rgba(236,72,153,0.10)'],   // 6: fuchsia / pink
+    ['rgba(16,185,129,0.15)', 'rgba(34,197,94,0.15)'],    // 7: emerald / green (deploy!)
+  ];
+  const [glow1, glow2] = stepGlow[Math.min(step, stepGlow.length - 1)];
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
-      {/* Background blobs */}
+      {/* Background blobs - colors shift with progress */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 -left-40 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
+        <div
+          className="absolute -top-40 -right-40 w-80 h-80 rounded-full blur-3xl"
+          style={{ backgroundColor: glow1, transition: 'background-color 1s ease' }}
+        />
+        <div
+          className="absolute bottom-0 -left-40 w-96 h-96 rounded-full blur-3xl"
+          style={{ backgroundColor: glow2, transition: 'background-color 1s ease' }}
+        />
       </div>
 
       {/* Step transition keyframes */}
