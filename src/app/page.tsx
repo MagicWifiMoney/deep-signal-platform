@@ -315,6 +315,24 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ── Trust badges ──────────────────────────────────────────────── */}
+      <section className="relative z-10 py-10 px-6 border-t border-slate-800/40">
+        <div className="max-w-3xl mx-auto flex flex-wrap items-center justify-center gap-x-8 gap-y-4 text-sm text-slate-500">
+          {[
+            { icon: '🔐', label: 'Your data stays yours' },
+            { icon: '🇩🇪', label: 'Runs on Hetzner (EU/US)' },
+            { icon: '🛠️', label: 'Powered by OpenClaw' },
+            { icon: '🚫', label: 'No vendor lock-in' },
+            { icon: '🔑', label: 'Full SSH access' },
+          ].map((badge) => (
+            <span key={badge.label} className="flex items-center gap-2 whitespace-nowrap">
+              <span>{badge.icon}</span>
+              <span>{badge.label}</span>
+            </span>
+          ))}
+        </div>
+      </section>
+
       {/* ── FAQ ─────────────────────────────────────────────────────────── */}
       <section className="relative z-10 px-6 lg:px-12 py-20 border-t border-slate-800/40">
         <div className="max-w-2xl mx-auto">

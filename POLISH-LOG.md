@@ -1,4 +1,21 @@
 
+## 2026-02-24 07:00 - Save Credentials + Token Security Fix
+
+**What:** Added "Save credentials" button on the success page. Downloads a `.txt` file with agent name, domain, IP, gateway token, and reconnect instructions. Also fixed a security issue where the "Share on X" button was embedding the gateway token in the public tweet URL.
+
+**Why:** Two real problems:
+1. Token loss - localStorage clears on deploy, users who close the tab can't find their token later. The credential file solves this permanently.
+2. Token exposure - sharing "I deployed my agent at https://name.ds.jgiebz.com/#token=abc123" on Twitter gives every follower auth access to your agent. Fixed by using clean domain in the public share URL.
+
+**Details:**
+- Save button styled amber to signal "do this now" urgency
+- Downloaded file has a clear "Keep this private!" header
+- File includes both the access URL and step-by-step reconnect instructions
+- Share on X now links to https://domain only (no token fragment)
+- Copy link still gives the full auth URL (right tool for private sharing)
+
+**Commit:** 7a1419a
+
 ## 2026-02-24 04:00 - localStorage Progress Persistence
 
 **What:** Onboarding form data and current step now save to localStorage automatically. If a user refreshes or accidentally closes the tab, they pick up right where they left off with a friendly "Picked up where you left off" banner + option to start over.
