@@ -227,7 +227,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Failed to fetch SSH keys from Hetzner' }, { status: 500 });
     }
     const sshData = await sshRes.json();
-    sshKeyId = sshData.ssh_keys?.[0]?.id ?? null;
+    // Find key by fingerprint to prevent using wrong key
+    // EC2 botti@clawd key (~/.ssh/id_ed25519)
+    const EXPECTED_FINGERPRINT = '34:cc:33:ff:39:3a:b1:65:98:c3:5b:fe:75:19:94:23';
+    const matchingKey = sshData.ssh_keys?.find(
+      (k: { fingerprint: string }) => k.fingerprint === EXPECTED_FINGERPRINT
+    );
+    if (matchingKey) {
+      sshKeyId = matchingKey.id;
+    } else {
+      console.error('[SSH] No key matching fingerprint', EXPECTED_FINGERPRINT, 'found. Keys:', JSON.stringify(sshData.ssh_keys?.map((k: { id: number; fingerprint: string }) => ({ id: k.id, fp: k.fingerprint }))));
+      sshKeyId = sshData.ssh_keys?.[0]?.id ?? null;
+    }
   } catch (e) {
     return NextResponse.json({ error: 'Hetzner connection failed' }, { status: 500 });
   }
