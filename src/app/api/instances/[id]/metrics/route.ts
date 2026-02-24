@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-const HETZNER_API_TOKEN = process.env.HETZNER_API_TOKEN || 'IMdbtCuR5QiGXfKtN4CHeK7fStB5keFhinbxDqOUkLHnFvaUGNSYNMc9pd5oKUuF';
+const HETZNER_API_TOKEN = process.env.HETZNER_API_TOKEN || '0jCakFyFQgljKel1iylEIiA9SrbU9kt5cUMfJ1DlyvF0Jb9waPK0rDJfyiUVAl7s';
 
 export async function GET(
   request: Request,

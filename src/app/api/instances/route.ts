@@ -142,26 +142,16 @@ export async function GET() {
       const tailscaleIp = server.public_net?.ipv4?.ip || '';
       const openclaw = await getOpenClawStatus(tailscaleIp);
 
-      // Derive domain from server name: "deepsignal-{slug}" → "{slug}.ds.jgiebz.com"
-      const slug = server.name?.replace(/^deepsignal-/, '') || '';
-      const domain = slug ? `${slug}.ds.jgiebz.com` : '';
-      // Gateway token from labels (stored during onboard) or empty
-      const gatewayToken = server.labels?.['gateway-token'] || '';
-
       return {
         id: server.id,
         name: server.name,
         hostname: server.name,
-        domain,
-        gatewayToken,
         publicIp: server.public_net?.ipv4?.ip || '',
-        ip: server.public_net?.ipv4?.ip || '',
-        tailscaleIp: tailscaleIp,
+        tailscaleIp: tailscaleIp, // Would need Tailscale API for real IP
         status: server.status === 'running' ? 'online' as const : 'offline' as const,
         serverType: server.server_type?.name || 'unknown',
         datacenter: server.datacenter?.name || 'unknown',
         created: server.created,
-        labels: server.labels || {},
         metrics: metrics || { cpu: 0, memory: 0, disk: 0 },
         openclaw: openclaw || undefined,
       };

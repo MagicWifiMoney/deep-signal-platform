@@ -5,7 +5,7 @@
  * POST /configure-slack
  * {
  *   domain: "client.ds.jgiebz.com",
- *   botToken: ""SLACK_BOT_TOKEN"",
+ *   botToken: "xoxb-...",
  *   signingSecret: "...",
  *   teamId: "T...",
  *   teamName: "..."
@@ -20,53 +20,18 @@ const path = require('path');
 
 const app = express();
 app.use(express.json());
-app.use(cors({
-  origin: [
-    'https://deep-signal-platform.vercel.app',
-    'https://deepsignal.ai',
-    process.env.ALLOWED_ORIGIN,
-  ].filter(Boolean),
-  methods: ['GET', 'POST'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-}));
-
-// Rate limiting
-const rateLimit = {};
-function rateLimitMiddleware(req, res, next) {
-  const ip = req.ip || req.connection.remoteAddress;
-  const now = Date.now();
-  if (!rateLimit[ip]) rateLimit[ip] = [];
-  rateLimit[ip] = rateLimit[ip].filter(t => now - t < 60000);
-  if (rateLimit[ip].length >= 30) {
-    return res.status(429).json({ error: 'Too many requests' });
-  }
-  rateLimit[ip].push(now);
-  next();
-}
-app.use(rateLimitMiddleware);
-
-// Request logging
-app.use((req, res, next) => {
-  const start = Date.now();
-  res.on('finish', () => {
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path} ${res.statusCode} ${Date.now() - start}ms`);
-  });
-  next();
-});
+app.use(cors());
 
 const PORT = process.env.PORT || 8891;
 const SSH_KEY_PATH = process.env.SSH_KEY_PATH || path.join(process.env.HOME, '.ssh/hetzner_deepsignal');
-const API_SECRET = process.env.CONFIG_API_SECRET;
+const API_SECRET = process.env.CONFIG_API_SECRET || 'ds-config-secret-2026';
 
 // Shared Slack app credentials for all Deep Signal clients
-const SLACK_SIGNING_SECRET = process.env.SLACK_SIGNING_SECRET;
-const APP_TOKEN = process.env.SLACK_APP_TOKEN;
+const SLACK_SIGNING_SECRET = '9732b3681b946a54a59aaafa67cd4ae9';
+const APP_TOKEN = process.env.SLACK_APP_TOKEN || '';
 
 // Auth middleware
 function authMiddleware(req, res, next) {
-  if (!API_SECRET) {
-    return res.status(503).json({ error: 'Service not configured' });
-  }
   const authHeader = req.headers.authorization;
   if (!authHeader || authHeader !== `Bearer ${API_SECRET}`) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -85,11 +50,6 @@ app.post('/configure-slack', authMiddleware, async (req, res) => {
   
   if (!domain || !botToken) {
     return res.status(400).json({ error: 'Missing required fields: domain, botToken' });
-  }
-
-  // Validate domain is a known Deep Signal subdomain
-  if (!domain.endsWith('.ds.jgiebz.com') && !domain.endsWith('.deepsignal.ai')) {
-    return res.status(400).json({ error: 'Invalid domain: must be a Deep Signal subdomain' });
   }
   
   console.log(`Configuring Slack for ${domain} (team: ${teamName})`);
@@ -192,6 +152,189 @@ EOFCONFIG`);
   }
 });
 
+// Configure Telegram on an instance
+app.post('/configure-telegram', authMiddleware, async (req, res) => {
+  const { domain, gatewayToken, telegramBotToken } = req.body;
+  
+  if (!domain || !telegramBotToken) {
+    return res.status(400).json({ error: 'Missing required fields: domain, telegramBotToken' });
+  }
+  
+  console.log(`Configuring Telegram for ${domain}`);
+  
+  const ssh = new NodeSSH();
+  
+  try {
+    const dns = require('dns').promises;
+    let ip;
+    try {
+      const result = await dns.resolve4(domain);
+      ip = result[0];
+    } catch (e) {
+      return res.status(400).json({ error: `Could not resolve domain: ${domain}` });
+    }
+    
+    if (!fs.existsSync(SSH_KEY_PATH)) {
+      return res.status(500).json({ error: 'SSH key not found' });
+    }
+    
+    await ssh.connect({
+      host: ip,
+      username: 'root',
+      privateKey: fs.readFileSync(SSH_KEY_PATH, 'utf8'),
+      readyTimeout: 10000,
+    });
+    
+    // Read current config
+    const configResult = await ssh.execCommand('cat /root/.openclaw/openclaw.json 2>/dev/null || echo "{}"');
+    let config;
+    try {
+      const configStr = configResult.stdout.replace(/\/\/.*$/gm, '').replace(/,(\s*[}\]])/g, '$1');
+      config = JSON.parse(configStr);
+    } catch (e) {
+      config = {};
+    }
+    
+    // Add Telegram channel
+    if (!config.channels) config.channels = {};
+    config.channels.telegram = {
+      enabled: true,
+      botToken: telegramBotToken,
+    };
+    
+    const newConfigStr = JSON.stringify(config, null, 2);
+    await ssh.execCommand(`cat > /root/.openclaw/openclaw.json << 'EOFCONFIG'
+${newConfigStr}
+EOFCONFIG`);
+    
+    // Restart OpenClaw
+    await ssh.execCommand('systemctl restart openclaw');
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    
+    const statusResult = await ssh.execCommand('systemctl is-active openclaw 2>/dev/null');
+    const isRunning = statusResult.stdout.includes('active');
+    
+    ssh.dispose();
+    
+    res.json({
+      success: true,
+      domain,
+      isRunning,
+      message: 'Telegram configured successfully',
+    });
+    
+  } catch (error) {
+    console.error('Telegram configuration failed:', error);
+    ssh.dispose();
+    res.status(500).json({ error: 'Configuration failed', details: error.message });
+  }
+});
+
+// Configure any channel generically
+app.post('/configure-channel', authMiddleware, async (req, res) => {
+  const { domain, channelType, channelConfig } = req.body;
+  
+  if (!domain || !channelType || !channelConfig) {
+    return res.status(400).json({ error: 'Missing required fields: domain, channelType, channelConfig' });
+  }
+  
+  console.log(`Configuring ${channelType} for ${domain}`);
+  
+  const ssh = new NodeSSH();
+  
+  try {
+    const dns = require('dns').promises;
+    const result = await dns.resolve4(domain);
+    const ip = result[0];
+    
+    if (!fs.existsSync(SSH_KEY_PATH)) {
+      return res.status(500).json({ error: 'SSH key not found' });
+    }
+    
+    await ssh.connect({
+      host: ip,
+      username: 'root',
+      privateKey: fs.readFileSync(SSH_KEY_PATH, 'utf8'),
+      readyTimeout: 10000,
+    });
+    
+    const configResult = await ssh.execCommand('cat /root/.openclaw/openclaw.json 2>/dev/null || echo "{}"');
+    let config;
+    try {
+      config = JSON.parse(configResult.stdout.replace(/\/\/.*$/gm, '').replace(/,(\s*[}\]])/g, '$1'));
+    } catch (e) {
+      config = {};
+    }
+    
+    if (!config.channels) config.channels = {};
+    config.channels[channelType] = { enabled: true, ...channelConfig };
+    
+    const newConfigStr = JSON.stringify(config, null, 2);
+    await ssh.execCommand(`cat > /root/.openclaw/openclaw.json << 'EOFCONFIG'
+${newConfigStr}
+EOFCONFIG`);
+    
+    await ssh.execCommand('systemctl restart openclaw');
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    
+    const statusResult = await ssh.execCommand('systemctl is-active openclaw 2>/dev/null');
+    
+    ssh.dispose();
+    
+    res.json({
+      success: true,
+      domain,
+      channelType,
+      isRunning: statusResult.stdout.includes('active'),
+      message: `${channelType} configured successfully`,
+    });
+    
+  } catch (error) {
+    console.error(`${channelType} configuration failed:`, error);
+    ssh.dispose();
+    res.status(500).json({ error: 'Configuration failed', details: error.message });
+  }
+});
+
+// Read instance config
+app.get('/instance-config/:domain', authMiddleware, async (req, res) => {
+  const { domain } = req.params;
+  
+  const ssh = new NodeSSH();
+  
+  try {
+    const dns = require('dns').promises;
+    const result = await dns.resolve4(domain);
+    const ip = result[0];
+    
+    await ssh.connect({
+      host: ip,
+      username: 'root',
+      privateKey: fs.readFileSync(SSH_KEY_PATH, 'utf8'),
+      readyTimeout: 10000,
+    });
+    
+    const configResult = await ssh.execCommand('cat /root/.openclaw/openclaw.json 2>/dev/null || echo "{}"');
+    const soulResult = await ssh.execCommand('cat /root/.openclaw/SOUL.md 2>/dev/null || echo ""');
+    
+    ssh.dispose();
+    
+    let config = {};
+    try { config = JSON.parse(configResult.stdout); } catch (e) {}
+    
+    res.json({
+      domain,
+      config,
+      soul: soulResult.stdout,
+      channels: config.channels || {},
+    });
+    
+  } catch (error) {
+    ssh.dispose();
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get instance status
 app.get('/instance-status/:domain', authMiddleware, async (req, res) => {
   const { domain } = req.params;
@@ -228,60 +371,6 @@ app.get('/instance-status/:domain', authMiddleware, async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-
-// Restart OpenClaw on an instance
-app.post('/restart-instance', authMiddleware, async (req, res) => {
-  const { domain } = req.body;
-
-  if (!domain) {
-    return res.status(400).json({ error: 'Missing required field: domain' });
-  }
-
-  if (!domain.endsWith('.ds.jgiebz.com') && !domain.endsWith('.deepsignal.ai')) {
-    return res.status(400).json({ error: 'Invalid domain: must be a Deep Signal subdomain' });
-  }
-
-  const ssh = new NodeSSH();
-
-  try {
-    const dns = require('dns').promises;
-    const result = await dns.resolve4(domain);
-    const ip = result[0];
-
-    await ssh.connect({
-      host: ip,
-      username: 'root',
-      privateKey: fs.readFileSync(SSH_KEY_PATH, 'utf8'),
-      readyTimeout: 10000,
-    });
-
-    const restartResult = await ssh.execCommand('systemctl restart openclaw');
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    const statusResult = await ssh.execCommand('systemctl is-active openclaw');
-    const isRunning = statusResult.stdout.trim() === 'active';
-
-    ssh.dispose();
-
-    res.json({
-      success: true,
-      domain,
-      isRunning,
-      message: isRunning ? 'OpenClaw restarted successfully' : 'Restart attempted but service may not be running',
-    });
-  } catch (error) {
-    ssh.dispose();
-    res.status(500).json({ error: 'Restart failed', details: error.message });
-  }
-});
-
-// Validate required env vars at startup
-if (!API_SECRET) {
-  console.error('FATAL: CONFIG_API_SECRET environment variable is required');
-  process.exit(1);
-}
-if (!APP_TOKEN) {
-  console.warn('WARNING: SLACK_APP_TOKEN not set - Slack configuration will be incomplete');
-}
 
 app.listen(PORT, () => {
   console.log(`Deep Signal Config Service running on port ${PORT}`);

@@ -42,6 +42,7 @@ interface OnboardingData {
   recipientName?: string;
   recipientContext?: string;
   setupPersonName?: string;
+  skills?: string[];
 }
 
 // ── Provider config map ────────────────────────────────────────────────────────
@@ -236,6 +237,41 @@ function generateCloudInit(data: OnboardingData, domain: string, token: string):
   const modelId = config.model;
   const apiKeyEnvName = config.env;
 
+  // Map frontend skill IDs to OpenClaw skill config entries
+  const skillMap: Record<string, { enabled: true }> = {};
+  const selectedSkills = data.skills || [];
+  // Map frontend IDs to OpenClaw bundled skill names
+  const skillIdToName: Record<string, string> = {
+    'weather': 'weather',
+    'web-search': 'web-search',
+    'notion': 'notion',
+    'google-workspace': 'gog',
+    'apple-notes': 'apple-notes',
+    'apple-reminders': 'apple-reminders',
+    'github': 'github',
+    'coding-agent': 'coding-agent',
+    'healthcheck': 'healthcheck',
+    'image-gen': 'nano-banana-pro',
+    'video-gen': 'veo',
+    'tts': 'sag',
+    'twitter': 'bird',
+    'typefully': 'typefully',
+    'reddit': 'reddit-search',
+    'seo': 'seo-dataforseo',
+    'google-trends': 'google-trends',
+    'deep-research': 'research',
+    'perplexity': 'perplexity',
+    'arxiv': 'arxiv',
+    'youtube-transcript': 'youtube-transcript',
+    'wallet': 'send-usdc',
+    'polymarket': 'polymarket',
+    'x402': 'x402',
+  };
+  for (const id of selectedSkills) {
+    const name = skillIdToName[id] || id;
+    skillMap[name] = { enabled: true };
+  }
+
   // Build OpenClaw config JSON - MUST include these exact keys for remote access
   const openclawConfig = JSON.stringify({
     agents: {
@@ -257,6 +293,9 @@ function generateCloudInit(data: OnboardingData, domain: string, token: string):
         dangerouslyDisableDeviceAuth: true,
         allowInsecureAuth: true,
       },
+    },
+    skills: {
+      entries: skillMap,
     },
     commands: {
       restart: true,
@@ -294,7 +333,9 @@ function generateCloudInit(data: OnboardingData, domain: string, token: string):
 - Draft content, emails, documents
 - Monitor websites
 - Manage your own config and channel settings
-
+- Install new skills: tell me "install the X skill" or run \`clawhub install <name>\`
+- Browse available skills at https://clawhub.com
+${selectedSkills.length > 0 ? `\n## Pre-installed Skills\n${selectedSkills.map(id => `- ${skillIdToName[id] || id}`).join('\\n')}\n` : ''}
 ## Rules
 - Be proactive - suggest things, don't wait to be asked
 - Keep responses concise and useful

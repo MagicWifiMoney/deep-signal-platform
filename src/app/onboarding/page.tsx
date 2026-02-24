@@ -22,6 +22,8 @@ interface FormData {
   vibe: 'professional' | 'friendly' | 'casual' | 'spicy';
   // Step 5: Channels
   channels: string[];
+  // Step 6: Skills
+  skills: string[];
 }
 
 interface DeploymentStatus {
@@ -158,6 +160,63 @@ const CHANNEL_OPTIONS = [
   },
 ];
 
+const SKILL_CATEGORIES = [
+  {
+    category: 'Productivity',
+    skills: [
+      { id: 'weather', emoji: '🌤️', name: 'Weather', description: 'Current weather and forecasts', popular: true },
+      { id: 'web-search', emoji: '🔍', name: 'Web Search', description: 'Search the internet with Brave Search', popular: true },
+      { id: 'notion', emoji: '📝', name: 'Notion', description: 'Read and write Notion pages and databases' },
+      { id: 'google-workspace', emoji: '📧', name: 'Google Workspace', description: 'Gmail, Calendar, Drive, Docs, Sheets' },
+      { id: 'apple-notes', emoji: '🍎', name: 'Apple Notes', description: 'Create and manage Apple Notes (macOS)' },
+      { id: 'apple-reminders', emoji: '⏰', name: 'Apple Reminders', description: 'Manage reminders and lists (macOS)' },
+    ],
+  },
+  {
+    category: 'Development',
+    skills: [
+      { id: 'github', emoji: '🐙', name: 'GitHub', description: 'Issues, PRs, repos, and CI/CD', popular: true },
+      { id: 'coding-agent', emoji: '🧩', name: 'Coding Agent', description: 'Delegate coding tasks to sub-agents', popular: true },
+      { id: 'healthcheck', emoji: '🛡️', name: 'Health Check', description: 'Security audits and system monitoring' },
+    ],
+  },
+  {
+    category: 'Creative',
+    skills: [
+      { id: 'image-gen', emoji: '🎨', name: 'Image Generation', description: 'Create images with AI (Gemini, OpenAI, Grok)', popular: true },
+      { id: 'video-gen', emoji: '🎬', name: 'Video Generation', description: 'Generate video clips with Google Veo' },
+      { id: 'tts', emoji: '🗣️', name: 'Text to Speech', description: 'Convert text to natural speech (ElevenLabs)' },
+    ],
+  },
+  {
+    category: 'Social & Marketing',
+    skills: [
+      { id: 'twitter', emoji: '🐦', name: 'Twitter/X', description: 'Read timelines, search, engage on X', popular: true },
+      { id: 'typefully', emoji: '✍️', name: 'Typefully', description: 'Draft and schedule social media posts' },
+      { id: 'reddit', emoji: '🟠', name: 'Reddit', description: 'Search Reddit posts and discussions' },
+      { id: 'seo', emoji: '📊', name: 'SEO Tools', description: 'Keyword research and search analytics' },
+      { id: 'google-trends', emoji: '📈', name: 'Google Trends', description: 'Track trending topics and keywords' },
+    ],
+  },
+  {
+    category: 'Research',
+    skills: [
+      { id: 'deep-research', emoji: '🔬', name: 'Deep Research', description: 'Multi-source research via Gemini (cheap)', popular: true },
+      { id: 'perplexity', emoji: '🧠', name: 'Perplexity', description: 'Research with citations using Perplexity AI' },
+      { id: 'arxiv', emoji: '📄', name: 'arXiv', description: 'Search and browse academic papers' },
+      { id: 'youtube-transcript', emoji: '📺', name: 'YouTube Transcripts', description: 'Summarize YouTube videos' },
+    ],
+  },
+  {
+    category: 'Crypto & Finance',
+    skills: [
+      { id: 'wallet', emoji: '💰', name: 'Crypto Wallet', description: 'Send USDC, trade tokens on Base' },
+      { id: 'polymarket', emoji: '🎯', name: 'Polymarket', description: 'Check prediction market odds' },
+      { id: 'x402', emoji: '💳', name: 'x402 Payments', description: 'Pay for and sell API services' },
+    ],
+  },
+];
+
 const DEPLOY_STEPS = [
   { emoji: '🔧', text: 'Building your server...' },
   { emoji: '📦', text: 'Installing OpenClaw...' },
@@ -236,7 +295,7 @@ function OnboardingContent() {
   const searchParams = useSearchParams();
   const isGiftMode = searchParams.get('mode') === 'gift';
 
-  const TOTAL_STEPS = 6;
+  const TOTAL_STEPS = 7;
   const [step, setStep] = useState(isGiftMode ? 0 : 0);
   const [showConfetti, setShowConfetti] = useState(false);
   const [isDeploying, setIsDeploying] = useState(false);
@@ -258,6 +317,7 @@ function OnboardingContent() {
     apiKey: '',
     vibe: 'friendly',
     channels: ['web'],
+    skills: ['weather', 'web-search', 'deep-research'],
   });
 
   const update = (key: keyof FormData, value: FormData[keyof FormData]) => {
@@ -270,6 +330,15 @@ function OnboardingContent() {
       channels: prev.channels.includes(id)
         ? prev.channels.filter((c) => c !== id)
         : [...prev.channels, id],
+    }));
+  };
+
+  const toggleSkill = (id: string) => {
+    setForm((prev) => ({
+      ...prev,
+      skills: prev.skills.includes(id)
+        ? prev.skills.filter((s) => s !== id)
+        : [...prev.skills, id],
     }));
   };
 
@@ -319,6 +388,7 @@ function OnboardingContent() {
           recipientName: form.recipientName,
           recipientContext: form.recipientContext,
           setupPersonName: form.setupPersonName,
+          skills: form.skills,
         }),
       });
 
@@ -730,8 +800,91 @@ function OnboardingContent() {
           </div>
         );
 
-      // ─ Step 5: Deploy ───────────────────────────────────────────────────
+      // ─ Step 5: Pick your skills ──────────────────────────────────────────
       case 5:
+        return (
+          <div className="max-w-2xl mx-auto">
+            <h2 className="text-3xl font-bold text-white mb-2">Pick your skills</h2>
+            <p className="text-slate-400 mb-2">
+              Skills teach {form.agentName || 'your agent'} how to use tools. Select what sounds useful.
+            </p>
+            <p className="text-sm text-slate-500 mb-8">
+              You can always add more later from <a href="https://clawhub.com" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline">ClawHub</a> or by telling your agent to install one.
+            </p>
+
+            <div className="space-y-8">
+              {SKILL_CATEGORIES.map((cat) => (
+                <div key={cat.category}>
+                  <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">
+                    {cat.category}
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {cat.skills.map((skill) => {
+                      const selected = form.skills.includes(skill.id);
+                      return (
+                        <button
+                          key={skill.id}
+                          onClick={() => toggleSkill(skill.id)}
+                          className={`p-3.5 rounded-xl border-2 text-left transition-all ${
+                            selected
+                              ? 'border-cyan-500 bg-cyan-500/10'
+                              : 'border-slate-700/60 bg-slate-800/30 hover:border-slate-600'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-start gap-2.5 min-w-0">
+                              <span className="text-lg flex-shrink-0">{skill.emoji}</span>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium text-white text-sm">{skill.name}</span>
+                                  {'popular' in skill && skill.popular && (
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-medium">
+                                      popular
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-slate-400 mt-0.5">{skill.description}</p>
+                              </div>
+                            </div>
+                            <div
+                              className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors ${
+                                selected ? 'bg-cyan-500 border-cyan-500' : 'border-slate-600'
+                              }`}
+                            >
+                              {selected && (
+                                <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-6 flex items-center justify-between p-4 rounded-xl bg-slate-800/30 border border-slate-700/50">
+              <span className="text-sm text-slate-400">
+                {form.skills.length} skill{form.skills.length !== 1 ? 's' : ''} selected
+              </span>
+              <button
+                onClick={() => {
+                  const allIds = SKILL_CATEGORIES.flatMap(c => c.skills.filter(s => 'popular' in s && s.popular).map(s => s.id));
+                  update('skills', allIds);
+                }}
+                className="text-xs text-cyan-400 hover:text-cyan-300 font-medium transition-colors"
+              >
+                Reset to recommended
+              </button>
+            </div>
+          </div>
+        );
+
+      // ─ Step 6: Deploy ───────────────────────────────────────────────────
+      case 6:
         if (deployDone && deployment) {
           const agentUrl = `https://${deployment.domain}/#token=${deployment.gatewayToken}`;
           const shareUrl = `https://deep-signal-platform.vercel.app/share?name=${encodeURIComponent(form.agentName)}&from=${encodeURIComponent(form.setupPersonName)}&url=${encodeURIComponent(agentUrl)}`;
@@ -920,6 +1073,10 @@ function OnboardingContent() {
               <div className="flex items-center justify-between p-4 rounded-xl bg-slate-800/50 border border-slate-700">
                 <span className="text-slate-400">Channels</span>
                 <span className="text-white font-medium">{form.channels.join(', ')}</span>
+              </div>
+              <div className="flex items-center justify-between p-4 rounded-xl bg-slate-800/50 border border-slate-700">
+                <span className="text-slate-400">Skills</span>
+                <span className="text-white font-medium">{form.skills.length} selected</span>
               </div>
               {!form.forSelf && (
                 <div className="flex items-center justify-between p-4 rounded-xl bg-slate-800/50 border border-cyan-500/30">
