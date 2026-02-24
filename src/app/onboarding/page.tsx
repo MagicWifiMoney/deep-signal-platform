@@ -453,6 +453,7 @@ function OnboardingContent() {
   const saved = getSavedState();
   const [step, setStep] = useState(saved?.step ?? 0);
   const [showConfetti, setShowConfetti] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   const [isDeploying, setIsDeploying] = useState(false);
   const [deployStepIndex, setDeployStepIndex] = useState(0);
   const [deployProgress, setDeployProgress] = useState(0);
@@ -1272,6 +1273,44 @@ function OnboardingContent() {
                     Live
                   </span>
                 </div>
+              </div>
+
+              {/* Share buttons */}
+              <div className="flex gap-3 mt-6">
+                <a
+                  href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`Just deployed my own AI agent${form.agentName ? ` named ${form.agentName}` : ''} with Deep Signal - it took like 2 minutes 🤯`)}&url=${encodeURIComponent(agentUrl)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-medium text-sm transition-all"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                  </svg>
+                  Share on X
+                </a>
+                <button
+                  onClick={() => {
+                    navigator.clipboard?.writeText(agentUrl);
+                    setLinkCopied(true);
+                    setTimeout(() => setLinkCopied(false), 2000);
+                  }}
+                  className={`flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl border font-medium text-sm transition-all ${
+                    linkCopied
+                      ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+                      : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-white'
+                  }`}
+                >
+                  {linkCopied ? (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                    </svg>
+                  )}
+                  {linkCopied ? 'Copied!' : 'Copy link'}
+                </button>
               </div>
             </div>
           );
