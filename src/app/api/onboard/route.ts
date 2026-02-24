@@ -536,6 +536,8 @@ echo "[DS] Agent: ${agentName}"
 
 // ── Cloudflare DNS ────────────────────────────────────────────────────────────
 export async function createDnsRecord(subdomain: string, ip: string): Promise<{ success: boolean; error?: string }> {
+  console.log(`[DNS] Creating record: ${subdomain}.${DOMAIN_SUFFIX} → ${ip}`);
+  console.log(`[DNS] CF token present: ${!!CLOUDFLARE_API_TOKEN}, length: ${CLOUDFLARE_API_TOKEN?.length}, zone: ${CLOUDFLARE_ZONE_ID}`);
   if (!CLOUDFLARE_API_TOKEN) {
     return { success: false, error: 'Cloudflare API token not configured' };
   }
@@ -737,11 +739,25 @@ export async function POST(request: Request) {
       if (!createRes.ok) {
         const errorText = await createRes.text();
         let errorMsg = 'Failed to create server';
+        let errorCode: string | undefined;
         try {
           const errorJson = JSON.parse(errorText);
           errorMsg = errorJson.error?.message || errorMsg;
+          errorCode = errorJson.error?.code;
         } catch {
           errorMsg = errorText || errorMsg;
+        }
+        // Detect Hetzner quota/capacity errors and surface a friendly code
+        const isCapacityError =
+          errorCode === 'resource_limit_exceeded' ||
+          errorCode === 'servers_limit_reached' ||
+          errorCode === 'project_limit_reached' ||
+          /limit.*reached|servers.*limit|maximum.*server|server.*quota/i.test(errorMsg);
+        if (isCapacityError) {
+          return NextResponse.json(
+            { error: "We've hit our server capacity limit. Join the waitlist and we'll notify you the moment a slot opens.", code: 'SERVER_CAPACITY' },
+            { status: 503 }
+          );
         }
         return NextResponse.json({ error: errorMsg }, { status: createRes.status });
       }

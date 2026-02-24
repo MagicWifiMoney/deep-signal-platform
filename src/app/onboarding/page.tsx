@@ -504,6 +504,10 @@ function OnboardingContent() {
   const [deployment, setDeployment] = useState<DeploymentStatus | null>(null);
   const [deployError, setDeployError] = useState<string | null>(null);
   const [deployDone, setDeployDone] = useState(false);
+  const [isCapacityError, setIsCapacityError] = useState(false);
+  const [waitlistEmail, setWaitlistEmail] = useState('');
+  const [waitlistSubmitted, setWaitlistSubmitted] = useState(false);
+  const [waitlistSubmitting, setWaitlistSubmitting] = useState(false);
   const deployStepRef = useRef(0);
   const [showResumedBanner, setShowResumedBanner] = useState(!!saved);
 
@@ -699,7 +703,16 @@ function OnboardingContent() {
         const text = await res.text();
         if (!text) throw new Error('Server returned empty response');
         const data = JSON.parse(text);
-        if (!res.ok) throw new Error(data.error || 'Deployment failed');
+        if (!res.ok) {
+          if (data.code === 'SERVER_CAPACITY') {
+            clearInterval(animInterval);
+            setIsCapacityError(true);
+            setDeployError(data.error || "We're at capacity right now.");
+            setIsDeploying(false);
+            return;
+          }
+          throw new Error(data.error || 'Deployment failed');
+        }
 
         instanceData = {
           id: data.instance.id,
@@ -727,7 +740,26 @@ function OnboardingContent() {
 
   const retryDeploy = () => {
     setDeployError(null);
+    setIsCapacityError(false);
+    setWaitlistSubmitted(false);
+    setWaitlistEmail('');
     handleDeploy();
+  };
+
+  const handleWaitlist = async () => {
+    if (!waitlistEmail.trim()) return;
+    setWaitlistSubmitting(true);
+    try {
+      await fetch('/api/waitlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: waitlistEmail.trim(), agentName: form.agentName || 'Agent' }),
+      });
+    } catch {
+      // Best effort - still show success
+    }
+    setWaitlistSubmitted(true);
+    setWaitlistSubmitting(false);
   };
 
   const switchToFreeTier = () => {
@@ -1603,42 +1635,96 @@ function OnboardingContent() {
 
             {/* Error recovery */}
             {deployError && (
-              <div className="p-5 rounded-xl bg-rose-500/10 border border-rose-500/30 mb-6">
-                <div className="flex items-start gap-3 mb-4">
-                  <span className="text-rose-400 text-xl flex-shrink-0">⚠️</span>
-                  <div>
-                    <div className="text-rose-400 font-semibold mb-1">Deployment failed</div>
-                    <p className="text-sm text-slate-300 leading-relaxed">{deployError}</p>
-                  </div>
-                </div>
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <button
-                    onClick={retryDeploy}
-                    className="flex-1 px-4 py-2.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 font-medium text-sm transition-colors"
-                  >
-                    Try Again
-                  </button>
-                  {isApiKeyError && (
-                    <button
-                      onClick={switchToFreeTier}
-                      className="flex-1 px-4 py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-200 font-medium text-sm transition-colors"
-                    >
-                      Start with Free Tier
-                    </button>
+              isCapacityError ? (
+                /* Capacity waitlist UI - friendly degradation instead of dead end */
+                <div className="p-5 rounded-xl bg-amber-500/10 border border-amber-500/30 mb-6">
+                  {waitlistSubmitted ? (
+                    <div className="text-center py-2">
+                      <div className="text-3xl mb-3">🎉</div>
+                      <div className="text-white font-semibold mb-1">You&apos;re on the list!</div>
+                      <p className="text-sm text-slate-300">
+                        We&apos;ll email <span className="text-amber-300">{waitlistEmail}</span> the moment a slot opens.
+                        Usually within 24 hours.
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-start gap-3 mb-4">
+                        <span className="text-2xl flex-shrink-0">⏳</span>
+                        <div>
+                          <div className="text-white font-semibold mb-1">We&apos;re at capacity right now</div>
+                          <p className="text-sm text-slate-300 leading-relaxed">
+                            High demand - all server slots are taken. Drop your email and you&apos;ll be first in line when one opens up.
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 mb-3">
+                        <input
+                          type="email"
+                          value={waitlistEmail}
+                          onChange={(e) => setWaitlistEmail(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && handleWaitlist()}
+                          placeholder="your@email.com"
+                          className="flex-1 px-4 py-2.5 rounded-xl bg-slate-800 border border-slate-600 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-amber-500/50"
+                        />
+                        <button
+                          onClick={handleWaitlist}
+                          disabled={waitlistSubmitting || !waitlistEmail.trim()}
+                          className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 disabled:cursor-not-allowed text-black font-semibold text-sm transition-colors whitespace-nowrap"
+                        >
+                          {waitlistSubmitting ? 'Saving...' : 'Notify me'}
+                        </button>
+                      </div>
+                      <div className="text-center">
+                        <button
+                          onClick={retryDeploy}
+                          className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
+                        >
+                          Try again anyway →
+                        </button>
+                      </div>
+                    </>
                   )}
                 </div>
-                <div className="mt-3 text-center">
-                  <a
-                    href="mailto:support@deepsignal.ai"
-                    className="text-xs text-slate-500 hover:text-cyan-400 transition-colors"
-                  >
-                    Need help? Contact support
-                  </a>
+              ) : (
+                /* Regular error UI */
+                <div className="p-5 rounded-xl bg-rose-500/10 border border-rose-500/30 mb-6">
+                  <div className="flex items-start gap-3 mb-4">
+                    <span className="text-rose-400 text-xl flex-shrink-0">⚠️</span>
+                    <div>
+                      <div className="text-rose-400 font-semibold mb-1">Deployment failed</div>
+                      <p className="text-sm text-slate-300 leading-relaxed">{deployError}</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <button
+                      onClick={retryDeploy}
+                      className="flex-1 px-4 py-2.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 font-medium text-sm transition-colors"
+                    >
+                      Try Again
+                    </button>
+                    {isApiKeyError && (
+                      <button
+                        onClick={switchToFreeTier}
+                        className="flex-1 px-4 py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-200 font-medium text-sm transition-colors"
+                      >
+                        Start with Free Tier
+                      </button>
+                    )}
+                  </div>
+                  <div className="mt-3 text-center">
+                    <a
+                      href="mailto:support@deepsignal.ai"
+                      className="text-xs text-slate-500 hover:text-cyan-400 transition-colors"
+                    >
+                      Need help? Contact support
+                    </a>
+                  </div>
                 </div>
-              </div>
+              )
             )}
 
-            {!deployError && (
+            {!deployError && !isCapacityError && (
               <button
                 onClick={handleDeploy}
                 className="w-full py-5 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold text-xl hover:shadow-2xl hover:shadow-cyan-500/25 transition-all"

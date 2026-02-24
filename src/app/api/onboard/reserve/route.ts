@@ -261,7 +261,24 @@ export async function POST(request: Request) {
     if (!createRes.ok) {
       const errText = await createRes.text();
       let msg = 'Failed to create server';
-      try { msg = JSON.parse(errText).error?.message || msg; } catch {}
+      let errCode: string | undefined;
+      try {
+        const errJson = JSON.parse(errText);
+        msg = errJson.error?.message || msg;
+        errCode = errJson.error?.code;
+      } catch {}
+      // Detect Hetzner quota/capacity errors
+      const isCapacity =
+        errCode === 'resource_limit_exceeded' ||
+        errCode === 'servers_limit_reached' ||
+        errCode === 'project_limit_reached' ||
+        /limit.*reached|servers.*limit|maximum.*server|server.*quota/i.test(msg);
+      if (isCapacity) {
+        return NextResponse.json(
+          { error: "Server capacity full", code: 'SERVER_CAPACITY' },
+          { status: 503 }
+        );
+      }
       return NextResponse.json({ error: msg }, { status: createRes.status });
     }
 

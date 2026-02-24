@@ -36,7 +36,7 @@ export async function POST(request: Request) {
         body: JSON.stringify({
           domain,
           gatewayToken,
-          telegramToken: botToken,
+          telegramBotToken: botToken,
         }),
       });
 
