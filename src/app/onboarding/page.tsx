@@ -712,13 +712,12 @@ function OnboardingContent() {
       }
 
       clearInterval(animInterval);
-      setDeployProgress(95);
-      setDeployStepIndex(DEPLOY_STEPS.length - 1);
 
       setDeployment(instanceData);
 
-      // Poll until ready
-      pollStatus(instanceData.id, instanceData.domain);
+      // Skip polling - go straight to success page
+      // The instance boots in background; user can start setting up Telegram/channels
+      finishDeploy();
     } catch (err: unknown) {
       clearInterval(animInterval);
       setDeployError(err instanceof Error ? err.message : 'Deployment failed');
@@ -1248,177 +1247,145 @@ function OnboardingContent() {
         if (deployDone && deployment) {
           const agentUrl = `https://${deployment.domain}/#token=${deployment.gatewayToken}`;
           const shareUrl = `https://deep-signal-platform.vercel.app/share?name=${encodeURIComponent(form.agentName)}&from=${encodeURIComponent(form.setupPersonName)}&url=${encodeURIComponent(agentUrl)}`;
+          const telegramSetupUrl = `https://deep-signal-platform.vercel.app/setup/telegram?domain=${encodeURIComponent(deployment.domain)}&token=${encodeURIComponent(deployment.gatewayToken)}&name=${encodeURIComponent(form.agentName)}`;
 
           return (
-            <div className="max-w-xl mx-auto text-center">
+            <div className="max-w-xl mx-auto">
               {showConfetti && <Confetti />}
 
-              {/* Success icon */}
-              <div className="w-24 h-24 mx-auto mb-6 rounded-3xl bg-gradient-to-br from-emerald-400 to-green-600 flex items-center justify-center shadow-2xl shadow-emerald-500/30">
-                <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
+              {/* Success header */}
+              <div className="text-center mb-8">
+                <div className="w-20 h-20 mx-auto mb-5 rounded-2xl bg-gradient-to-br from-emerald-400 to-green-600 flex items-center justify-center shadow-2xl shadow-emerald-500/30">
+                  <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <h2 className="text-3xl font-bold text-white mb-2">
+                  {form.agentName || 'Your agent'} is deploying!
+                </h2>
+                <p className="text-slate-400">
+                  Your server is booting up now. Takes about 2 minutes - pick how you want to chat while it finishes.
+                </p>
               </div>
 
-              <h2 className="text-4xl font-bold text-white mb-3">
-                {form.agentName || 'Your agent'} is live!
-              </h2>
-              <p className="text-slate-400 text-lg mb-8">
-                {!form.forSelf
-                  ? `Ready to share with ${form.recipientName || 'your friend'}.`
-                  : 'Your personal AI is up and running.'}
-              </p>
-
-              {/* Primary CTA */}
-              <a
-                href={agentUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group w-full inline-flex items-center justify-center gap-3 px-8 py-5 rounded-2xl bg-gradient-to-r from-emerald-500 to-green-600 text-white font-bold text-xl hover:shadow-2xl hover:shadow-emerald-500/30 transition-all mb-4"
-              >
-                Chat with {form.agentName || 'your agent'}
-                <span className="transition-transform group-hover:translate-x-1">→</span>
-              </a>
-
-              {/* Gift mode share link */}
+              {/* Gift mode share */}
               {!form.forSelf && (
-                <div className="mb-8 p-5 rounded-2xl bg-slate-800/50 border border-slate-700">
-                  <p className="text-sm text-slate-300 mb-3 font-medium">
-                    Share this link with {form.recipientName || 'your friend'}:
+                <div className="mb-6 p-4 rounded-2xl bg-cyan-500/10 border border-cyan-500/20">
+                  <p className="text-sm text-cyan-300 font-medium mb-2">
+                    🎁 Share with {form.recipientName || 'your friend'}
                   </p>
-                  <div className="flex items-center gap-2 mb-3">
+                  <div className="flex items-center gap-2">
                     <code className="flex-1 text-xs bg-slate-900/60 px-3 py-2 rounded-lg text-cyan-400 font-mono truncate">
                       {shareUrl}
                     </code>
                     <button
-                      onClick={() => navigator.clipboard?.writeText(shareUrl)}
-                      className="px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs transition-colors"
+                      onClick={() => { navigator.clipboard?.writeText(shareUrl); setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2000); }}
+                      className="px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs transition-colors flex-shrink-0"
                     >
-                      Copy
+                      {linkCopied ? '✓' : 'Copy'}
                     </button>
                   </div>
-                  <p className="text-xs text-slate-500">
-                    They&apos;ll see a welcome page and go straight to their agent.
-                  </p>
                 </div>
               )}
 
-              {/* Instance details */}
-              <div className="text-left p-5 rounded-2xl bg-slate-800/40 border border-slate-700 space-y-3 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Domain</span>
-                  <a
-                    href={agentUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-cyan-400 font-mono text-xs hover:underline"
-                  >
-                    {deployment.domain}
-                  </a>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">IP Address</span>
-                  <span className="text-white font-mono text-xs">{deployment.ip}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Status</span>
-                  <span className="text-emerald-400 flex items-center gap-1.5 text-xs">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block" />
-                    Live
-                  </span>
-                </div>
-              </div>
-
-              {/* Conversation Starters */}
-              <div className="mt-6">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
-                  Say something to get started 👇
+              {/* How to chat - the main event */}
+              <div className="space-y-3 mb-6">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  Choose how to chat
                 </p>
-                <div className="space-y-2">
-                  {[
-                    { emoji: '👋', text: `Introduce yourself and show me the most impressive thing you can do right now.` },
-                    { emoji: '🔍', text: `Search the web and give me the top 3 AI news stories today.` },
-                    { emoji: '⚡', text: `What's one thing you can automate or help me with right now?` },
-                  ].map((starter, i) => (
-                    <button
-                      key={i}
-                      onClick={() => {
-                        navigator.clipboard?.writeText(starter.text);
-                        setCopiedStarter(i);
-                        setTimeout(() => setCopiedStarter(null), 2000);
-                        window.open(agentUrl, '_blank');
-                      }}
-                      className={`w-full text-left flex items-start gap-3 px-4 py-3 rounded-xl border transition-all text-sm ${
-                        copiedStarter === i
-                          ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
-                          : 'bg-slate-800/40 border-slate-700/60 text-slate-300 hover:bg-slate-700/60 hover:border-slate-600 hover:text-white'
-                      }`}
-                    >
-                      <span className="flex-shrink-0 mt-0.5">{copiedStarter === i ? '✓' : starter.emoji}</span>
-                      <span className="flex-1">{copiedStarter === i ? 'Copied! Paste it in your agent →' : starter.text}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
 
-              {/* Share buttons */}
-              <div className="flex gap-3 mt-6">
+                {/* Option 1: Web chat */}
                 <a
-                  href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`Just deployed my own AI agent${form.agentName ? ` named ${form.agentName}` : ''} with Deep Signal - it took like 2 minutes 🤯`)}&url=${encodeURIComponent(`https://${deployment.domain}`)}`}
+                  href={agentUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-medium text-sm transition-all"
+                  className="group flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-r from-emerald-500/10 to-green-500/10 border-2 border-emerald-500/30 hover:border-emerald-500/50 transition-all"
                 >
-                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                  </svg>
-                  Share on X
+                  <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                    <span className="text-2xl">💬</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-white">Open Web Chat</div>
+                    <div className="text-sm text-slate-400">Chat in your browser - ready when server finishes booting</div>
+                  </div>
+                  <span className="text-emerald-400 transition-transform group-hover:translate-x-1 flex-shrink-0">→</span>
                 </a>
+
+                {/* Option 2: Telegram */}
+                <a
+                  href={telegramSetupUrl}
+                  className="group flex items-center gap-4 p-4 rounded-2xl bg-slate-800/50 border-2 border-slate-700 hover:border-blue-500/30 transition-all"
+                >
+                  <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                    <span className="text-2xl">✈️</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-white">Set up Telegram</div>
+                    <div className="text-sm text-slate-400">Chat from your phone - 2 min setup with BotFather</div>
+                  </div>
+                  <span className="text-slate-500 transition-transform group-hover:translate-x-1 group-hover:text-blue-400 flex-shrink-0">→</span>
+                </a>
+
+                {/* Option 3: Discord */}
                 <button
                   onClick={() => {
-                    navigator.clipboard?.writeText(agentUrl);
-                    setLinkCopied(true);
-                    setTimeout(() => setLinkCopied(false), 2000);
+                    const msg = `To connect Discord, open your web chat and tell your agent: "Set up Discord for me"`;
+                    navigator.clipboard?.writeText(msg);
+                    setCopiedStarter(10);
+                    setTimeout(() => setCopiedStarter(null), 2000);
                   }}
-                  className={`flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl border font-medium text-sm transition-all ${
-                    linkCopied
-                      ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
-                      : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-white'
-                  }`}
+                  className="group flex items-center gap-4 p-4 rounded-2xl bg-slate-800/50 border-2 border-slate-700 hover:border-indigo-500/30 transition-all w-full text-left"
                 >
-                  {linkCopied ? (
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  ) : (
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
-                    </svg>
-                  )}
-                  {linkCopied ? 'Copied!' : 'Copy link'}
+                  <div className="w-12 h-12 rounded-xl bg-indigo-500/20 flex items-center justify-center flex-shrink-0">
+                    <span className="text-2xl">🎮</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-white">
+                      {copiedStarter === 10 ? '✓ Instructions copied!' : 'Set up Discord'}
+                    </div>
+                    <div className="text-sm text-slate-400">Ask your agent in web chat to set it up for you</div>
+                  </div>
                 </button>
               </div>
+
+              {/* Your agent details - collapsible */}
+              <details className="mb-4">
+                <summary className="cursor-pointer text-sm text-slate-500 hover:text-slate-300 transition-colors py-2">
+                  📋 Your agent details
+                </summary>
+                <div className="mt-2 p-4 rounded-xl bg-slate-800/40 border border-slate-700 space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Domain</span>
+                    <span className="text-cyan-400 font-mono text-xs">{deployment.domain}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">IP</span>
+                    <span className="text-white font-mono text-xs">{deployment.ip}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Token</span>
+                    <span className="text-white font-mono text-xs">{deployment.gatewayToken.substring(0, 8)}...</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Status</span>
+                    <span className="text-amber-400 flex items-center gap-1.5 text-xs">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse inline-block" />
+                      Booting up (~2 min)
+                    </span>
+                  </div>
+                </div>
+              </details>
 
               {/* Save credentials */}
               <button
                 onClick={() => {
                   const credsText = [
                     `# ${form.agentName || 'My Agent'} - Access Credentials`,
-                    `# Generated: ${new Date().toISOString()}`,
-                    `# Keep this file private - it contains your gateway token!`,
-                    ``,
                     `Agent Name:    ${form.agentName || 'My Agent'}`,
-                    `Dashboard URL: https://${deployment.domain}`,
-                    `IP Address:    ${deployment.ip}`,
+                    `Dashboard:     https://${deployment.domain}`,
+                    `Access Link:   ${agentUrl}`,
                     `Gateway Token: ${deployment.gatewayToken}`,
-                    ``,
-                    `# Your access link (includes token for auto-login):`,
-                    `${agentUrl}`,
-                    ``,
-                    `# To reconnect later:`,
-                    `# 1. Open the Dashboard URL above`,
-                    `# 2. Enter your Gateway Token when prompted`,
-                    `# Or just bookmark your access link above.`,
+                    `IP Address:    ${deployment.ip}`,
                   ].join('\n');
                   const blob = new Blob([credsText], { type: 'text/plain' });
                   const url = URL.createObjectURL(blob);
@@ -1428,12 +1395,9 @@ function OnboardingContent() {
                   a.click();
                   URL.revokeObjectURL(url);
                 }}
-                className="w-full mt-3 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 font-medium text-sm transition-all"
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 font-medium text-sm transition-all"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
-                Save credentials (don&apos;t lose your token)
+                💾 Save credentials
               </button>
             </div>
           );

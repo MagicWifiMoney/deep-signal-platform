@@ -77,6 +77,7 @@ const providerConfigs = {
     env: 'GEMINI_API_KEY',
     providers: {},
   },
+  // MiniMax available but using Gemini Flash for free tier (more reliable)
   anthropic: {
     model: 'anthropic/claude-sonnet-4-6',
     env: 'ANTHROPIC_API_KEY',

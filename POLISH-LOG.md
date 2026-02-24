@@ -120,3 +120,18 @@
 - No new dependencies
 
 **Commit:** 543e4dc
+
+## 2026-02-24 10:03 - Agent Naming Easter Eggs
+
+**What:** Type a famous AI name during onboarding and get a themed preview message + custom avatar gradient. 9 easter eggs: Jarvis (Iron Man red/gold), Friday (blue/purple), HAL (red, with the joke), Cortana (blue/indigo), Skynet (reassuring), Samantha (Her pink), GLaDOS (Portal sass), Botti (our own), and Clippy (the legend).
+
+**Why:** Pure delight. Zero UX cost - if you don't type a famous name, nothing changes. But if you DO, you get a little moment of "oh they thought of that." It's the kind of detail that makes people screenshot and share. Also gives the naming step more personality beyond just picking from a list.
+
+**Details:**
+- Easter egg lookup is case-insensitive
+- Custom gradient on the avatar circle per character
+- Themed first message in the preview bubble
+- Subtle "Nice reference" text appears below
+- No new dependencies, no layout shifts
+
+**Commit:** 3a25f88
