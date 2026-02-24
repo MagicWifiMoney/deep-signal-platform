@@ -663,7 +663,7 @@ export async function createDnsRecord(subdomain: string, ip: string): Promise<{ 
         }
       );
     } else {
-      await fetch(
+      const createRes = await fetch(
         `https://api.cloudflare.com/client/v4/zones/${CLOUDFLARE_ZONE_ID}/dns_records`,
         {
           method: 'POST',
@@ -680,6 +680,12 @@ export async function createDnsRecord(subdomain: string, ip: string): Promise<{ 
           }),
         }
       );
+      const createData = await createRes.json() as { success?: boolean; errors?: Array<{ message: string }> };
+      if (!createData.success) {
+        const errMsg = createData.errors?.map(e => e.message).join(', ') || 'Unknown Cloudflare error';
+        console.error(`[DNS] Create failed for ${fullDomain}: ${errMsg}`);
+        return { success: false, error: errMsg };
+      }
     }
 
     return { success: true };
@@ -858,11 +864,23 @@ export async function POST(request: Request) {
 
     const serverIp = serverData.server?.public_net?.ipv4?.ip;
 
-    // Create DNS record
+    // Create DNS record - MUST succeed for the instance to work
     if (serverIp) {
-      const dnsResult = await createDnsRecord(slug, serverIp);
-      if (!dnsResult.success) {
-        console.error('DNS creation failed:', dnsResult.error);
+      let dnsSuccess = false;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        const dnsResult = await createDnsRecord(slug, serverIp);
+        if (dnsResult.success) {
+          console.log(`[DNS] Record created for ${slug}.${DOMAIN_SUFFIX} → ${serverIp} (attempt ${attempt})`);
+          dnsSuccess = true;
+          break;
+        }
+        console.error(`[DNS] Attempt ${attempt}/3 failed: ${dnsResult.error}`);
+        if (attempt < 3) await new Promise(r => setTimeout(r, 2000));
+      }
+      if (!dnsSuccess) {
+        console.error(`[DNS] All 3 attempts failed for ${slug}.${DOMAIN_SUFFIX}. Instance ${hostname} created but DNS missing.`);
+        // Don't fail the whole request — server is created, DNS can be added manually
+        // But include a warning in the response
       }
     }
 
