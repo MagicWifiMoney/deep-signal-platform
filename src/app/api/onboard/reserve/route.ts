@@ -320,9 +320,13 @@ export async function POST(request: Request) {
 
   const ip = serverData.server?.public_net?.ipv4?.ip;
 
-  // Create DNS record in background (don't block)
+  // Create DNS record — MUST await before returning (Vercel kills function after response)
   if (ip) {
-    createDnsRecord(slug, ip).catch(() => {});
+    try {
+      await createDnsRecord(slug, ip);
+    } catch (e) {
+      console.error('[DNS] DNS creation failed but continuing:', e);
+    }
   }
 
   return NextResponse.json({
