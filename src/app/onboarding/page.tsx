@@ -161,7 +161,7 @@ function InstanceReadyChecker({ domain, token, ip }: { domain: string; token: st
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
-          Dashboard Ready - Open Now
+          Chat with Your Agent →
         </a>
       ) : (
         <div className="flex flex-col sm:flex-row items-center gap-3">
@@ -1078,27 +1078,21 @@ export default function Onboarding() {
               </div>
             </div>
 
-            {/* Primary CTAs */}
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
-              {deployment && (
-                <Link
-                  href={`/setup/wizard?domain=${deployment.domain}&token=${deployment.gatewayToken}&name=${encodeURIComponent(formData.agentName)}&company=${encodeURIComponent(formData.companyName)}`}
-                  className="w-full sm:w-auto text-center px-8 py-4 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-semibold hover:shadow-lg hover:shadow-cyan-500/25 transition-all"
-                >
-                  Set Up Your Agent →
-                </Link>
-              )}
-            </div>
-
-            {/* Dashboard readiness checker */}
+            {/* Primary CTA - Go straight to the agent */}
             {deployment && (
-              <div className="mb-8 flex flex-col items-center gap-2">
-                <p className="text-sm text-slate-400">Direct access to your OpenClaw dashboard:</p>
+              <div className="flex flex-col items-center gap-4 mb-8">
                 <InstanceReadyChecker
                   domain={deployment.domain}
                   token={deployment.gatewayToken}
                   ip={deployment.ip}
                 />
+                <p className="text-sm text-slate-400">Your agent will walk you through everything from here.</p>
+                <Link
+                  href={`/setup/wizard?domain=${deployment.domain}&token=${deployment.gatewayToken}&name=${encodeURIComponent(formData.agentName)}&company=${encodeURIComponent(formData.companyName)}`}
+                  className="text-sm text-slate-500 hover:text-slate-300 transition-colors"
+                >
+                  Or use the manual setup wizard →
+                </Link>
               </div>
             )}
 
