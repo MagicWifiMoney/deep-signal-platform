@@ -914,9 +914,9 @@ export default function Onboarding() {
                   <>
                     <div className="flex justify-between">
                       <span className="text-slate-400">Dashboard URL</span>
-                      <a href={`https://${deployment.domain}/#token=${deployment.gatewayToken}`} target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline font-mono">
+                      <Link href={`/dashboard?domain=${deployment.domain}&token=${deployment.gatewayToken}`} className="text-cyan-400 hover:underline font-mono">
                         {deployment.domain}
-                      </a>
+                      </Link>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-400">IP Address</span>
@@ -963,14 +963,12 @@ export default function Onboarding() {
                 </Link>
               )}
               {deployment && (
-                <a
-                  href={`https://${deployment.domain}/#token=${deployment.gatewayToken}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <Link
+                  href={`/dashboard?domain=${deployment.domain}&token=${deployment.gatewayToken}`}
                   className="w-full sm:w-auto text-center px-8 py-4 rounded-xl bg-slate-800/50 border border-slate-700 text-white font-semibold hover:bg-slate-800 transition-colors"
                 >
-                  Skip to Dashboard →
-                </a>
+                  Go to Dashboard →
+                </Link>
               )}
             </div>
 

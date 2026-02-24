@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { getSettings, saveSettings } from '@/lib/store';
 
 interface Message {
@@ -25,14 +26,40 @@ interface Stats {
   onlineInstances: number;
 }
 
-export default function Dashboard() {
+const INSTANCE_STORAGE_KEY = 'deep-signal-instance';
+
+function loadStoredInstance(): { domain: string; token: string } | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(INSTANCE_STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch { /* ignore */ }
+  return null;
+}
+
+function saveInstance(domain: string, token: string) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(INSTANCE_STORAGE_KEY, JSON.stringify({ domain, token }));
+  } catch { /* ignore */ }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+function DashboardContent() {
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState('overview');
   const [settings, setSettings] = useState(getSettings());
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  
+
+  // Instance connection
+  const [instanceDomain, setInstanceDomain] = useState('');
+  const [instanceToken, setInstanceToken] = useState('');
+  const [connectionStatus, setConnectionStatus] = useState<'checking' | 'online' | 'offline' | 'unknown'>('unknown');
+
   const [stats, setStats] = useState<Stats>({
     messagesTotal: 0,
     messagesToday: 0,
@@ -47,33 +74,77 @@ export default function Dashboard() {
     onlineInstances: 0,
   });
 
-  // Fetch real stats from APIs
+  // ── Init: read domain + token from URL params or localStorage ──────────────
+  useEffect(() => {
+    const urlDomain = searchParams.get('domain') || '';
+    const urlToken = searchParams.get('token') || '';
+
+    if (urlDomain && urlToken) {
+      setInstanceDomain(urlDomain);
+      setInstanceToken(urlToken);
+      saveInstance(urlDomain, urlToken);
+    } else {
+      const stored = loadStoredInstance();
+      if (stored) {
+        setInstanceDomain(stored.domain);
+        setInstanceToken(stored.token);
+      }
+    }
+  }, [searchParams]);
+
+  // ── Health check on mount / when instance changes ─────────────────────────
+  useEffect(() => {
+    if (!instanceDomain || !instanceToken) return;
+
+    const check = async () => {
+      setConnectionStatus('checking');
+      try {
+        const res = await fetch(`https://${instanceDomain}/health`, {
+          headers: { 'Authorization': `Bearer ${instanceToken}` },
+          signal: AbortSignal.timeout(5000),
+        });
+        setConnectionStatus(res.ok ? 'online' : 'offline');
+      } catch {
+        // Try /v1/models as fallback health check
+        try {
+          const res2 = await fetch(`https://${instanceDomain}/v1/models`, {
+            headers: { 'Authorization': `Bearer ${instanceToken}` },
+            signal: AbortSignal.timeout(5000),
+          });
+          setConnectionStatus(res2.ok ? 'online' : 'offline');
+        } catch {
+          setConnectionStatus('offline');
+        }
+      }
+    };
+
+    check();
+  }, [instanceDomain, instanceToken]);
+
+  // ── Fetch real stats ───────────────────────────────────────────────────────
   useEffect(() => {
     const fetchRealStats = async () => {
       try {
-        // Fetch instances
         const instancesRes = await fetch('/api/instances');
         const instancesData = await instancesRes.json();
         const instances = instancesData.instances || [];
-        
-        // Fetch billing
+
         const billingRes = await fetch('/api/billing');
         const billingData = await billingRes.json();
-        
-        // Calculate real stats
+
         const totalMessages = instances.reduce((sum: number, i: any) => sum + (i.openclaw?.messagesToday || 0), 0);
         const totalMessagesTotal = instances.reduce((sum: number, i: any) => sum + (i.openclaw?.messagesTotal || 0), 0);
         const onlineCount = instances.filter((i: any) => i.status === 'online').length;
-        const avgUptime = instances.length > 0 
+        const avgUptime = instances.length > 0
           ? instances.reduce((sum: number, i: any) => sum + (i.openclaw?.uptime || 0), 0) / instances.length
           : 0;
-        
+
         setStats({
           messagesTotal: totalMessagesTotal,
           messagesToday: totalMessages,
-          avgResponseTime: 1.2, // Would need to track this separately
-          satisfaction: 94, // Would need feedback system for this
-          tokensUsed: 2.4, // Would need to track this
+          avgResponseTime: 1.2,
+          satisfaction: 94,
+          tokensUsed: 2.4,
           tokenLimit: 10,
           status: onlineCount > 0 ? 'online' : 'offline',
           uptime: avgUptime,
@@ -85,59 +156,161 @@ export default function Dashboard() {
         console.error('Failed to fetch real stats:', error);
       }
     };
-    
+
     fetchRealStats();
-    // Refresh every 30 seconds
     const interval = setInterval(fetchRealStats, 30000);
     return () => clearInterval(interval);
   }, []);
 
-  // Load settings on mount
   useEffect(() => {
     setSettings(getSettings());
   }, []);
 
-  // Scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Send message
+  // ── Send message with SSE streaming ───────────────────────────────────────
   const sendMessage = async () => {
-    if (!inputMessage.trim()) return;
+    const text = inputMessage.trim();
+    if (!text || isStreaming) return;
 
-    const userMessage: Message = {
+    const userMsg: Message = {
       id: Date.now().toString(),
       role: 'user',
-      content: inputMessage,
+      content: text,
       timestamp: new Date(),
     };
-    
-    setMessages(prev => [...prev, userMessage]);
+    setMessages(prev => [...prev, userMsg]);
     setInputMessage('');
-    setIsTyping(true);
+    setIsStreaming(true);
 
-    // Simulate AI response
-    await new Promise(r => setTimeout(r, 1000 + Math.random() * 1000));
-    
-    const responses = [
-      `I understand you're asking about "${inputMessage.slice(0, 30)}...". Let me help you with that!`,
-      `Great question! Based on your input, here's what I can tell you...`,
-      `Thanks for reaching out. I'd be happy to assist with your inquiry.`,
-      `I've analyzed your request. Here's my recommendation...`,
-    ];
-
-    const assistantMessage: Message = {
-      id: (Date.now() + 1).toString(),
+    const assistantId = (Date.now() + 1).toString();
+    // Add placeholder assistant message
+    setMessages(prev => [...prev, {
+      id: assistantId,
       role: 'assistant',
-      content: responses[Math.floor(Math.random() * responses.length)],
+      content: '',
       timestamp: new Date(),
-    };
+    }]);
 
-    setMessages(prev => [...prev, assistantMessage]);
-    setIsTyping(false);
+    // Build conversation history for context
+    const history = messages.map(m => ({
+      role: m.role === 'user' ? 'user' : 'assistant',
+      content: m.content,
+    }));
+
+    if (instanceDomain && instanceToken) {
+      // Real instance via SSE streaming
+      try {
+        const res = await fetch(`https://${instanceDomain}/v1/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${instanceToken}`,
+          },
+          body: JSON.stringify({
+            model: 'default',
+            messages: [...history, { role: 'user', content: text }],
+            stream: true,
+          }),
+        });
+
+        if (!res.ok || !res.body) {
+          const errText = await res.text().catch(() => 'Unknown error');
+          throw new Error(`Agent returned ${res.status}: ${errText.substring(0, 100)}`);
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() ?? '';
+
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            const data = line.slice(6).trim();
+            if (data === '[DONE]') break;
+            try {
+              const parsed = JSON.parse(data);
+              const delta = parsed.choices?.[0]?.delta?.content ?? '';
+              if (delta) {
+                setMessages(prev => prev.map(m =>
+                  m.id === assistantId ? { ...m, content: m.content + delta } : m
+                ));
+              }
+            } catch { /* skip malformed chunks */ }
+          }
+        }
+
+        // If no streaming content came back, try non-streaming fallback
+        setMessages(prev => {
+          const assistant = prev.find(m => m.id === assistantId);
+          if (assistant && !assistant.content) {
+            return prev.map(m =>
+              m.id === assistantId
+                ? { ...m, content: '(No response received. The agent may still be starting up.)' }
+                : m
+            );
+          }
+          return prev;
+        });
+
+      } catch (err: any) {
+        console.error('Chat error:', err);
+        setMessages(prev => prev.map(m =>
+          m.id === assistantId
+            ? { ...m, content: `Connection error: ${err.message}. Make sure the instance is online and the token is correct.` }
+            : m
+        ));
+      }
+    } else {
+      // No instance configured - show helpful message
+      await new Promise(r => setTimeout(r, 500));
+      setMessages(prev => prev.map(m =>
+        m.id === assistantId
+          ? { ...m, content: 'No instance connected. Please complete onboarding first or provide a domain + token in the URL: /dashboard?domain=your-instance.ds.jgiebz.com&token=ds-xxxxx' }
+          : m
+      ));
+    }
+
+    setIsStreaming(false);
     setStats(prev => ({ ...prev, messagesToday: prev.messagesToday + 1 }));
   };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  };
+
+  const statusColor = {
+    online: 'text-emerald-400',
+    offline: 'text-rose-400',
+    checking: 'text-yellow-400',
+    unknown: 'text-slate-400',
+  }[connectionStatus];
+
+  const statusLabel = {
+    online: 'Online',
+    offline: 'Offline',
+    checking: 'Connecting...',
+    unknown: instanceDomain ? 'Unknown' : 'No Instance',
+  }[connectionStatus];
+
+  const statusBg = {
+    online: 'bg-emerald-500/10 border-emerald-500/30',
+    offline: 'bg-rose-500/10 border-rose-500/30',
+    checking: 'bg-yellow-500/10 border-yellow-500/30',
+    unknown: 'bg-slate-500/10 border-slate-500/30',
+  }[connectionStatus];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
@@ -186,6 +359,14 @@ export default function Dashboard() {
           ))}
         </nav>
 
+        {/* Instance info */}
+        {instanceDomain && (
+          <div className="glass rounded-xl p-4 mb-3">
+            <div className="text-xs text-slate-500 mb-1">Connected Instance</div>
+            <div className="text-xs text-cyan-400 font-mono truncate">{instanceDomain}</div>
+          </div>
+        )}
+
         {/* Token Usage */}
         <div className="glass rounded-xl p-4">
           <div className="flex items-center justify-between mb-2">
@@ -193,7 +374,7 @@ export default function Dashboard() {
             <span className="text-sm text-cyan-400">{stats.tokensUsed}M / {stats.tokenLimit}M</span>
           </div>
           <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
-            <div 
+            <div
               className="h-full bg-gradient-to-r from-cyan-500 to-blue-600 rounded-full transition-all duration-500"
               style={{ width: `${(stats.tokensUsed / stats.tokenLimit) * 100}%` }}
             />
@@ -211,48 +392,70 @@ export default function Dashboard() {
               {activeTab === 'chat' && 'Live Chat'}
               {activeTab === 'analytics' && 'Analytics'}
             </h1>
-            <p className="text-slate-400">
-              {settings.agentName} • {settings.model.split('/').pop()}
+            <p className="text-slate-400 text-sm">
+              {settings.agentName} · {instanceDomain || 'No instance connected'}
             </p>
           </div>
-          
+
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-emerald-400 font-medium">Online</span>
+            <div className={`flex items-center gap-2 px-4 py-2 rounded-xl border ${statusBg}`}>
+              <span className={`w-2 h-2 rounded-full ${connectionStatus === 'online' ? 'bg-emerald-400 animate-pulse' : connectionStatus === 'checking' ? 'bg-yellow-400 animate-pulse' : 'bg-rose-400'}`} />
+              <span className={`font-medium text-sm ${statusColor}`}>{statusLabel}</span>
             </div>
-            
-            <Link 
+
+            <Link
               href="https://missioncontrol.jgiebz.com"
               className="px-4 py-2 rounded-xl bg-slate-800/50 border border-slate-700 text-slate-300 hover:text-white transition-colors"
             >
               Mission Control
             </Link>
-            
-            <Link href="/sign-in" className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors">
-              <span className="text-slate-400">👤</span>
-            </Link>
+
+            {!instanceDomain && (
+              <Link
+                href="/onboarding"
+                className="px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-medium text-sm hover:opacity-90 transition-opacity"
+              >
+                Get Started
+              </Link>
+            )}
           </div>
         </header>
+
+        {/* No instance banner */}
+        {!instanceDomain && (
+          <div className="mx-6 mt-6 p-4 rounded-xl bg-cyan-500/10 border border-cyan-500/30">
+            <div className="flex items-center gap-3">
+              <span className="text-cyan-400 text-lg">💡</span>
+              <div>
+                <p className="text-sm font-medium text-white">No instance connected</p>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Complete onboarding to deploy your AI agent, or add <code className="text-cyan-400">?domain=...&token=...</code> to the URL to connect an existing instance.
+                </p>
+              </div>
+              <Link href="/onboarding" className="ml-auto px-4 py-2 rounded-lg bg-cyan-500/20 text-cyan-400 text-sm font-medium hover:bg-cyan-500/30 transition-colors whitespace-nowrap">
+                Deploy Instance →
+              </Link>
+            </div>
+          </div>
+        )}
 
         {/* Overview Tab */}
         {activeTab === 'overview' && (
           <div className="p-6">
-            {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
               {[
                 { label: 'Total Instances', value: stats.totalInstances, detail: `${stats.onlineInstances} online`, icon: '🖥️' },
                 { label: 'Messages Today', value: stats.messagesToday, detail: `${stats.messagesTotal.toLocaleString()} total`, icon: '💬' },
                 { label: 'Monthly Cost', value: `$${stats.totalMonthlyCost.toFixed(2)}`, detail: 'Infrastructure', icon: '💰' },
-                { label: 'Uptime', value: `${stats.uptime.toFixed(1)}%`, detail: stats.status === 'online' ? 'All systems operational' : 'System offline', icon: '🟢' },
+                { label: 'Uptime', value: `${stats.uptime.toFixed(1)}%`, detail: connectionStatus === 'online' ? 'All systems operational' : 'System offline', icon: '🟢' },
               ].map((stat, i) => (
                 <div key={i} className="glass rounded-2xl p-6">
                   <div className="flex items-center justify-between mb-4">
                     <span className="text-3xl">{stat.icon}</span>
                     <span className={`text-xs px-2 py-1 rounded-full ${
-                      stats.status === 'online' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-500/20 text-slate-400'
+                      connectionStatus === 'online' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-500/20 text-slate-400'
                     }`}>
-                      {stats.status}
+                      {connectionStatus}
                     </span>
                   </div>
                   <div className="text-3xl font-bold text-white mb-1">{stat.value}</div>
@@ -262,9 +465,7 @@ export default function Dashboard() {
               ))}
             </div>
 
-            {/* Quick Actions + Agent Info */}
             <div className="grid lg:grid-cols-3 gap-6">
-              {/* Quick Actions */}
               <div className="glass rounded-2xl p-6">
                 <h3 className="font-semibold text-white mb-4">Quick Actions</h3>
                 <div className="grid grid-cols-2 gap-3">
@@ -299,7 +500,6 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* Agent Card */}
               <div className="glass rounded-2xl p-6">
                 <div className="flex items-center gap-4 mb-6">
                   <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center text-2xl">
@@ -310,7 +510,7 @@ export default function Dashboard() {
                     <p className="text-sm text-slate-400">{settings.model.split('/').pop()}</p>
                   </div>
                 </div>
-                
+
                 <div className="space-y-3 text-sm">
                   <div className="flex justify-between">
                     <span className="text-slate-400">Tone</span>
@@ -324,15 +524,20 @@ export default function Dashboard() {
                     <span className="text-slate-400">Max Tokens</span>
                     <span className="text-white">{settings.maxTokens}</span>
                   </div>
+                  {instanceDomain && (
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Instance</span>
+                      <span className="text-cyan-400 font-mono text-xs truncate max-w-[140px]">{instanceDomain}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Activity Chart */}
               <div className="glass rounded-2xl p-6">
                 <h3 className="font-semibold text-white mb-4">Messages (24h)</h3>
                 <div className="h-32 flex items-end gap-1">
                   {Array.from({ length: 24 }, (_, i) => (
-                    <div 
+                    <div
                       key={i}
                       className="flex-1 bg-gradient-to-t from-cyan-500/20 to-cyan-500/50 rounded-t transition-all hover:from-cyan-500/30 hover:to-cyan-500/60"
                       style={{ height: `${20 + Math.random() * 80}%` }}
@@ -351,16 +556,32 @@ export default function Dashboard() {
         {/* Chat Tab */}
         {activeTab === 'chat' && (
           <div className="flex flex-col h-[calc(100vh-80px)]">
+            {/* Connection warning */}
+            {connectionStatus === 'offline' && instanceDomain && (
+              <div className="mx-4 mt-3 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-sm text-rose-400">
+                Instance appears offline. Messages will show connection errors. Wait a moment and try again.
+              </div>
+            )}
+            {connectionStatus === 'checking' && (
+              <div className="mx-4 mt-3 p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-sm text-yellow-400">
+                Connecting to instance...
+              </div>
+            )}
+
             {/* Messages */}
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
               {messages.length === 0 && (
                 <div className="text-center py-20">
                   <div className="text-6xl mb-4">💬</div>
                   <h3 className="text-xl font-semibold text-white mb-2">Start a conversation</h3>
-                  <p className="text-slate-400">Test your AI agent by sending a message</p>
+                  <p className="text-slate-400">
+                    {instanceDomain
+                      ? `Chatting live with ${instanceDomain}`
+                      : 'No instance connected - complete onboarding first'}
+                  </p>
                 </div>
               )}
-              
+
               {messages.map((msg) => (
                 <div
                   key={msg.id}
@@ -374,26 +595,24 @@ export default function Dashboard() {
                     <div className="text-xs text-slate-400 mb-1">
                       {msg.role === 'user' ? 'You' : settings.agentName}
                     </div>
-                    <p>{msg.content}</p>
+                    <p className="whitespace-pre-wrap">{msg.content}</p>
+                    {msg.role === 'assistant' && isStreaming && !msg.content && (
+                      <div className="flex gap-1 mt-1">
+                        <span className="w-2 h-2 bg-slate-500 rounded-full animate-bounce" />
+                        <span className="w-2 h-2 bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
+                        <span className="w-2 h-2 bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                      </div>
+                    )}
+                    {msg.role === 'assistant' && isStreaming && msg.content && (
+                      <span className="inline-block w-2 h-4 bg-cyan-400 ml-0.5 align-text-bottom animate-[blink_1s_step-end_infinite]" />
+                    )}
                     <div className="text-xs text-slate-500 mt-2">
                       {msg.timestamp.toLocaleTimeString()}
                     </div>
                   </div>
                 </div>
               ))}
-              
-              {isTyping && (
-                <div className="flex justify-start">
-                  <div className="bg-slate-800 rounded-2xl p-4">
-                    <div className="flex gap-1">
-                      <span className="w-2 h-2 bg-slate-500 rounded-full animate-bounce" />
-                      <span className="w-2 h-2 bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
-                      <span className="w-2 h-2 bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
-                    </div>
-                  </div>
-                </div>
-              )}
-              
+
               <div ref={messagesEndRef} />
             </div>
 
@@ -404,16 +623,21 @@ export default function Dashboard() {
                   type="text"
                   value={inputMessage}
                   onChange={(e) => setInputMessage(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-                  placeholder="Type a message..."
-                  className="flex-1 px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
+                  onKeyDown={handleKeyDown}
+                  placeholder={instanceDomain ? 'Type a message...' : 'No instance connected...'}
+                  disabled={!instanceDomain}
+                  className="flex-1 px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                 />
                 <button
                   onClick={sendMessage}
-                  disabled={!inputMessage.trim() || isTyping}
+                  disabled={!inputMessage.trim() || isStreaming || !instanceDomain}
                   className="px-6 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-cyan-500/25 transition-all"
                 >
-                  Send
+                  {isStreaming ? (
+                    <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  ) : 'Send'}
                 </button>
               </div>
             </div>
@@ -446,9 +670,9 @@ export default function Dashboard() {
               <div className="glass rounded-2xl p-6">
                 <h3 className="font-semibold text-white mb-4">Messages by Day</h3>
                 <div className="h-48 flex items-end gap-2">
-                  {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, i) => (
+                  {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
                     <div key={day} className="flex-1 flex flex-col items-center">
-                      <div 
+                      <div
                         className="w-full bg-gradient-to-t from-cyan-500/30 to-cyan-500/60 rounded-t"
                         style={{ height: `${30 + Math.random() * 70}%` }}
                       />
@@ -472,7 +696,7 @@ export default function Dashboard() {
                         <span className="text-white">{item.percent}%</span>
                       </div>
                       <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
-                        <div 
+                        <div
                           className={`h-full ${item.color} rounded-full`}
                           style={{ width: `${item.percent}%` }}
                         />
@@ -482,33 +706,21 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
-
-            <div className="glass rounded-2xl p-6">
-              <h3 className="font-semibold text-white mb-4">Top Topics</h3>
-              <div className="grid md:grid-cols-3 gap-4">
-                {[
-                  { topic: 'Password Reset', count: 156, trend: '+12%' },
-                  { topic: 'Billing Questions', count: 98, trend: '+5%' },
-                  { topic: 'Product Info', count: 87, trend: '-3%' },
-                  { topic: 'Technical Support', count: 76, trend: '+8%' },
-                  { topic: 'Account Settings', count: 54, trend: '+2%' },
-                  { topic: 'Shipping Status', count: 43, trend: '-1%' },
-                ].map((item, i) => (
-                  <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-slate-800/50">
-                    <div>
-                      <div className="text-white font-medium">{item.topic}</div>
-                      <div className="text-sm text-slate-400">{item.count} conversations</div>
-                    </div>
-                    <span className={`text-sm ${item.trend.startsWith('+') ? 'text-emerald-400' : 'text-rose-400'}`}>
-                      {item.trend}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
         )}
       </main>
     </div>
+  );
+}
+
+export default function Dashboard() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <DashboardContent />
+    </Suspense>
   );
 }

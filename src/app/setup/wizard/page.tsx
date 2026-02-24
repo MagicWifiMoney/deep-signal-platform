@@ -547,7 +547,7 @@ function TestStep({ params, onNext }: { params: WizardParams; onNext: () => void
 
 // ---- Step 4: Done ----
 function DoneStep({ params, connected }: { params: WizardParams; connected: ConnectedChannels }) {
-  const dashboardUrl = `https://${params.domain}/#token=${params.token}`;
+  const dashboardUrl = `/dashboard?domain=${params.domain}&token=${params.token}`;
   const channelCount = Object.values(connected).filter(Boolean).length;
 
   return (
@@ -635,14 +635,12 @@ function DoneStep({ params, connected }: { params: WizardParams; connected: Conn
         )}
       </div>
 
-      <a
+      <Link
         href={dashboardUrl}
-        target="_blank"
-        rel="noopener noreferrer"
         className="inline-block px-10 py-4 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-semibold text-lg hover:shadow-lg hover:shadow-cyan-500/25 transition-all"
       >
         Go to Dashboard →
-      </a>
+      </Link>
     </div>
   );
 }
@@ -707,14 +705,12 @@ function WizardContent() {
           ))}
         </div>
 
-        <a
-          href={`https://${params.domain}/#token=${params.token}`}
-          target="_blank"
-          rel="noopener noreferrer"
+        <Link
+          href={`/dashboard?domain=${params.domain}&token=${params.token}`}
           className="text-sm text-slate-400 hover:text-white transition-colors"
         >
           Skip to Dashboard
-        </a>
+        </Link>
       </header>
 
       {/* Step labels */}
