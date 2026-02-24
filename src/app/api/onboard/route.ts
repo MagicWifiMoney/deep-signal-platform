@@ -73,8 +73,8 @@ interface OnboardingData {
 // ── Provider config map ────────────────────────────────────────────────────────
 const providerConfigs = {
   free: {
-    model: 'kilocode/minimax/MiniMax-M2.5',
-    env: '',
+    model: 'google/gemini-2.0-flash',
+    env: 'GEMINI_API_KEY',
     providers: {},
   },
   anthropic: {
@@ -93,8 +93,8 @@ const providerConfigs = {
     providers: {},
   },
   later: {
-    model: 'kilocode/minimax/MiniMax-M2.5',
-    env: '',
+    model: 'google/gemini-2.0-flash',
+    env: 'GEMINI_API_KEY',
     providers: {},
   },
 };
@@ -355,9 +355,12 @@ export function generateCloudInit(data: OnboardingData, domain: string, token: s
   const agentName = data.agentName || 'Agent';
   const companyName = data.companyName || agentName;
 
+  // API key: use user-provided key, or server-side Gemini key for free tier
+  const effectiveApiKey = data.apiKey || (provider === 'free' || provider === 'later' ? process.env.GEMINI_API_KEY || '' : '');
+
   // API key environment line (only if we have one)
   // NOTE: kept only in systemd service file - NOT written to the log
-  const envLine = apiKeyEnvName && data.apiKey
+  const envLine = apiKeyEnvName && effectiveApiKey
     ? `Environment=${apiKeyEnvName}=__DS_API_KEY__`
     : '';
 
@@ -396,7 +399,7 @@ ${selectedSkills.length > 0 ? `\n## Pre-installed Skills\n${selectedSkills.map(i
   // Build the API key injection line for systemd
   // Security: we redirect output to /dev/null for this section so the key
   // never appears in /var/log/deepsignal-bootstrap.log
-  const apiKeyInjection = apiKeyEnvName && data.apiKey
+  const apiKeyInjection = apiKeyEnvName && effectiveApiKey
     ? `
 # ── Inject API key into systemd service (output suppressed for security) ──────
 # Redirect output to /dev/null so the key is NOT written to the bootstrap log.
@@ -404,7 +407,7 @@ ${selectedSkills.length > 0 ? `\n## Pre-installed Skills\n${selectedSkills.map(i
 {
   set +x
   # Replace placeholder with actual key
-  sed -i 's|Environment=${apiKeyEnvName}=__DS_API_KEY__|Environment=${apiKeyEnvName}=${data.apiKey.replace(/'/g, "'\\''").replace(/\//g, '\\/')}|g' /etc/systemd/system/openclaw.service
+  sed -i 's|Environment=${apiKeyEnvName}=__DS_API_KEY__|Environment=${apiKeyEnvName}=${effectiveApiKey.replace(/'/g, "'\\''").replace(/\//g, '\\/')}|g' /etc/systemd/system/openclaw.service
 } > /dev/null 2>&1
 set -x
 systemctl daemon-reload

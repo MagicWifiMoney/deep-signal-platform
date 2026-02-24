@@ -61,7 +61,7 @@ async function createDnsRecord(subdomain: string, ip: string): Promise<void> {
 
 function buildDefaultCloudInit(agentName: string, domain: string, token: string): string {
   const openclawConfig = JSON.stringify({
-    agents: { defaults: { model: { primary: 'kilocode/minimax/MiniMax-M2.5' } } },
+    agents: { defaults: { model: { primary: 'google/gemini-2.0-flash' } } },
     gateway: {
       mode: 'local',
       bind: 'lan',
