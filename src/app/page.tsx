@@ -1,7 +1,171 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+
+// ── Animated Chat Preview ──────────────────────────────────────────────────────
+
+interface ChatMessage {
+  role: 'user' | 'agent';
+  text: string;
+}
+
+const DEMO_CONVERSATIONS: ChatMessage[][] = [
+  [
+    { role: 'user', text: 'Check my calendar and draft a reply to Sarah about the meeting' },
+    { role: 'agent', text: 'You have a 2pm conflict on Thursday. I drafted a reply suggesting Friday at 10am instead - want me to send it?' },
+    { role: 'user', text: 'Perfect, send it' },
+    { role: 'agent', text: 'Done. Email sent and Friday 10am blocked on your calendar.' },
+  ],
+  [
+    { role: 'user', text: 'Summarize the top 3 things from my inbox today' },
+    { role: 'agent', text: '1. AWS bill jumped 40% - looks like that dev instance was left running\n2. New lead from the contact form (SaaS company, 50 seats)\n3. Your accountant needs Q4 receipts by Friday' },
+    { role: 'user', text: 'Kill that dev instance and forward the lead to sales' },
+    { role: 'agent', text: 'Instance terminated (saves ~$47/mo). Lead forwarded to sales@... with your intro template.' },
+  ],
+  [
+    { role: 'user', text: 'What happened on Slack while I was out?' },
+    { role: 'agent', text: 'Engineering shipped the auth fix. Marketing wants approval on the blog post draft. One customer ticket flagged as urgent - password reset loop.' },
+    { role: 'user', text: 'Approve the blog post and show me the ticket' },
+    { role: 'agent', text: 'Blog post approved and scheduled for tomorrow 9am. Here is the ticket - looks like a cache issue. Want me to escalate to eng?' },
+  ],
+];
+
+function ChatPreview() {
+  const [convoIndex, setConvoIndex] = useState(0);
+  const [visibleMessages, setVisibleMessages] = useState<{ role: string; text: string; typing?: boolean }[]>([]);
+  const [charIndex, setCharIndex] = useState(0);
+  const [msgIndex, setMsgIndex] = useState(0);
+  const [isTyping, setIsTyping] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const convo = DEMO_CONVERSATIONS[convoIndex];
+
+  useEffect(() => {
+    // Reset for new conversation
+    setVisibleMessages([]);
+    setCharIndex(0);
+    setMsgIndex(0);
+    setIsTyping(false);
+  }, [convoIndex]);
+
+  useEffect(() => {
+    if (msgIndex >= convo.length) {
+      // Conversation done - pause then cycle
+      const timer = setTimeout(() => {
+        setConvoIndex((i) => (i + 1) % DEMO_CONVERSATIONS.length);
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+
+    const currentMsg = convo[msgIndex];
+
+    if (currentMsg.role === 'user') {
+      // User messages appear instantly after a brief pause
+      const timer = setTimeout(() => {
+        setVisibleMessages((prev) => [...prev, { role: 'user', text: currentMsg.text }]);
+        setMsgIndex((i) => i + 1);
+        setCharIndex(0);
+      }, msgIndex === 0 ? 800 : 1200);
+      return () => clearTimeout(timer);
+    }
+
+    // Agent messages type out character by character
+    if (charIndex === 0) {
+      // Show typing indicator first
+      const timer = setTimeout(() => {
+        setIsTyping(true);
+        setTimeout(() => {
+          setIsTyping(false);
+          setCharIndex(1);
+        }, 600);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+
+    if (charIndex <= currentMsg.text.length) {
+      const timer = setTimeout(() => {
+        setVisibleMessages((prev) => {
+          const updated = [...prev];
+          const lastMsg = updated[updated.length - 1];
+          if (lastMsg && lastMsg.role === 'agent' && lastMsg.typing) {
+            lastMsg.text = currentMsg.text.slice(0, charIndex);
+          } else {
+            updated.push({ role: 'agent', text: currentMsg.text.slice(0, charIndex), typing: true });
+          }
+          return updated;
+        });
+        setCharIndex((c) => c + 1);
+      }, 18 + Math.random() * 12);
+      return () => clearTimeout(timer);
+    } else {
+      // Finished typing this message
+      setVisibleMessages((prev) => {
+        const updated = [...prev];
+        const lastMsg = updated[updated.length - 1];
+        if (lastMsg) lastMsg.typing = false;
+        return updated;
+      });
+      setMsgIndex((i) => i + 1);
+      setCharIndex(0);
+    }
+  }, [convo, msgIndex, charIndex, convoIndex]);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [visibleMessages, isTyping]);
+
+  return (
+    <div className="max-w-lg mx-auto mt-12 mb-4">
+      <div className="rounded-2xl bg-slate-900/80 border border-slate-700/60 overflow-hidden shadow-2xl shadow-cyan-500/5">
+        {/* Window chrome */}
+        <div className="flex items-center gap-2 px-4 py-3 bg-slate-800/60 border-b border-slate-700/40">
+          <div className="flex gap-1.5">
+            <div className="w-3 h-3 rounded-full bg-red-500/60" />
+            <div className="w-3 h-3 rounded-full bg-yellow-500/60" />
+            <div className="w-3 h-3 rounded-full bg-green-500/60" />
+          </div>
+          <div className="flex-1 text-center">
+            <span className="text-xs text-slate-500 font-mono">my-agent.deep-signal.io</span>
+          </div>
+          <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+        </div>
+
+        {/* Chat area */}
+        <div ref={scrollRef} className="p-4 space-y-3 h-[220px] overflow-hidden">
+          {visibleMessages.map((msg, i) => (
+            <div key={`${convoIndex}-${i}`} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div
+                className={`max-w-[85%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-line ${
+                  msg.role === 'user'
+                    ? 'bg-cyan-600/30 text-cyan-100 rounded-br-md'
+                    : 'bg-slate-800/80 text-slate-200 rounded-bl-md border border-slate-700/40'
+                }`}
+              >
+                {msg.text}
+                {msg.typing && <span className="inline-block w-0.5 h-4 bg-cyan-400 ml-0.5 animate-pulse align-middle" />}
+              </div>
+            </div>
+          ))}
+          {isTyping && (
+            <div className="flex justify-start">
+              <div className="px-4 py-3 rounded-2xl rounded-bl-md bg-slate-800/80 border border-slate-700/40">
+                <div className="flex gap-1.5">
+                  <div className="w-2 h-2 rounded-full bg-slate-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <div className="w-2 h-2 rounded-full bg-slate-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <div className="w-2 h-2 rounded-full bg-slate-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+      <p className="text-center text-xs text-slate-600 mt-3">Live preview - this is what your agent can do</p>
+    </div>
+  );
+}
 
 function FAQItem({ question, answer }: { question: string; answer: string }) {
   const [open, setOpen] = useState(false);
@@ -138,6 +302,9 @@ export default function Home() {
             <p className="mt-6 text-sm text-slate-600">
               No credit card required to start - deploy in under 5 minutes
             </p>
+
+            {/* Animated chat preview */}
+            <ChatPreview />
           </div>
 
           {/* Feature Cards */}

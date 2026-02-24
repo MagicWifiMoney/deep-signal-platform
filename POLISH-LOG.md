@@ -60,3 +60,16 @@
 - No new dependencies
 
 **Commit:** 9e6ad09
+
+## 2026-02-24 07:00 - Trust Badges Section
+
+**What:** Added a trust badges row on the landing page between the stats bar and FAQ section. Five badges: "Your data stays yours", "Runs on Hetzner (EU/US)", "Powered by OpenClaw", "No vendor lock-in", "Full SSH access".
+
+**Why:** Social proof and trust signals right before the FAQ (where people go when they're on the fence). These address the top objections - privacy, ownership, flexibility - in a scannable format. Zero friction, high signal.
+
+**Details:**
+- Emoji + label format, flex-wrap for mobile
+- Sits between stats bar and FAQ for natural reading flow
+- No new dependencies
+
+**Commit:** 1a827ca
