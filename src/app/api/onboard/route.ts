@@ -832,7 +832,7 @@ export async function POST(request: Request) {
         ip: serverIp || 'pending',
         domain,
         status: 'provisioning',
-        dashboardUrl: `https://${domain}`,
+        dashboardUrl: `https://${domain}/#token=${gatewayToken}`,
         estimatedReadyTime: '2-3 minutes',
         gatewayToken,
         config: {
