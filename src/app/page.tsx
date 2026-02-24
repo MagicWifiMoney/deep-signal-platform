@@ -2,10 +2,6 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import TerminalChat from '@/components/TerminalChat';
-
-const AGENT_URL = process.env.NEXT_PUBLIC_ONBOARDING_AGENT_URL ?? '';
-const AGENT_TOKEN = process.env.NEXT_PUBLIC_ONBOARDING_AGENT_TOKEN ?? '';
 
 export default function Home() {
   const [mounted, setMounted] = useState(false);
@@ -29,7 +25,7 @@ export default function Home() {
         />
       </div>
 
-      {/* ── Header ──────────────────────────────────────────────────────── */}
+      {/* Header */}
       <header className="relative z-10 flex items-center justify-between p-6 lg:px-12">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center">
@@ -48,141 +44,169 @@ export default function Home() {
             Dashboard
           </Link>
           <Link href="/support" className="text-slate-400 hover:text-white transition-colors">
-            Need help?
+            Support
           </Link>
           <Link
             href="/onboarding"
             className="px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-medium hover:opacity-90 transition-opacity"
           >
-            Get Started
+            Deploy Now
           </Link>
         </nav>
+
+        {/* Mobile nav */}
+        <Link
+          href="/onboarding"
+          className="md:hidden px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-medium text-sm"
+        >
+          Deploy
+        </Link>
       </header>
 
-      {/* ── Hero ───────────────────────────────────────────────────────── */}
+      {/* Hero */}
       <main className="relative z-10 px-6 lg:px-12">
-        <div className="max-w-6xl mx-auto">
-
-          {/* Condensed headline */}
+        <div className="max-w-5xl mx-auto">
           <div
-            className={`text-center pt-8 pb-6 transition-all duration-1000 ${
+            className={`text-center pt-16 pb-20 transition-all duration-1000 ${
               mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
             }`}
           >
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-800/50 border border-slate-700/50 mb-5 w-fit mx-auto">
+            {/* Badge */}
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-800/60 border border-slate-700/60 mb-8 mx-auto">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-sm text-slate-400">AI-powered · Enterprise-ready · Fully managed</span>
+              <span className="text-sm text-slate-300">Your AI. Your server. No compromises.</span>
             </div>
 
-            <h1 className="text-4xl md:text-5xl font-bold mb-3 leading-tight">
-              <span className="text-white">Your AI Assistant,</span>{' '}
-              <span className="gradient-text">Deployed in Minutes</span>
+            {/* Headline */}
+            <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight tracking-tight">
+              <span className="text-white">Your AI,</span>
+              <br />
+              <span className="gradient-text">Your Server,</span>
+              <br />
+              <span className="text-white">Your Rules.</span>
             </h1>
 
-            <p className="text-lg text-slate-400 max-w-2xl mx-auto mb-5">
-              Enterprise-grade AI agents, dedicated to your business.
-              Private instances, zero shared infrastructure, complete control.
+            <p className="text-xl text-slate-400 max-w-2xl mx-auto mb-10 leading-relaxed">
+              Deploy a personal AI agent on your own dedicated server in minutes.
+              Private, powerful, and connected to everything you use.
             </p>
 
-            <div className="flex items-center justify-center gap-4 flex-wrap">
+            {/* CTAs */}
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link
                 href="/onboarding"
-                className="group px-7 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-semibold text-base hover:shadow-lg hover:shadow-cyan-500/25 transition-all duration-300"
+                className="group w-full sm:w-auto px-8 py-4 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-semibold text-lg hover:shadow-xl hover:shadow-cyan-500/30 transition-all duration-300 flex items-center justify-center gap-2"
               >
-                Start Your Instance
-                <span className="inline-block ml-2 transition-transform group-hover:translate-x-1">→</span>
+                Deploy Your Agent
+                <span className="transition-transform group-hover:translate-x-1">→</span>
               </Link>
               <Link
-                href="https://missioncontrol.jgiebz.com"
-                className="px-7 py-3 rounded-xl bg-slate-800/50 border border-slate-700 text-white font-semibold text-base hover:bg-slate-800 transition-colors"
+                href="/onboarding?mode=gift"
+                className="w-full sm:w-auto px-8 py-4 rounded-xl bg-slate-800/60 border border-slate-700 text-slate-300 font-medium text-lg hover:bg-slate-800 hover:text-white transition-all duration-200 flex items-center justify-center gap-2"
               >
-                Mission Control
+                🎁 Set up for someone else
               </Link>
             </div>
+
+            {/* Trust line */}
+            <p className="mt-6 text-sm text-slate-600">
+              No credit card required to start - deploy in under 5 minutes
+            </p>
           </div>
 
-          {/* Full-width terminal - the hero experience */}
+          {/* Feature Cards */}
           <div
-            className={`transition-all duration-1000 delay-200 ${
+            className={`grid grid-cols-1 sm:grid-cols-3 gap-6 pb-24 transition-all duration-1000 delay-200 ${
               mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
             }`}
           >
-            <div className="text-xs text-slate-600 font-mono mb-2 pl-1">
-              // talk to Signal — no signup required
-            </div>
-            <TerminalChat
-              mode="onboarding"
-              agentUrl={AGENT_URL}
-              agentToken={AGENT_TOKEN}
-              className="w-full min-h-[60vh] sm:min-h-[520px]"
-            />
-          </div>
-
-          {/* Stats row below terminal */}
-          <div
-            className={`grid grid-cols-3 gap-8 mt-8 mb-4 max-w-lg mx-auto transition-all duration-1000 delay-300 ${
-              mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
-            }`}
-          >
-            <div className="text-center">
-              <div className="text-3xl font-bold text-white mb-1">$10</div>
-              <div className="text-slate-500 text-sm">per month / instance</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-white mb-1">5 min</div>
-              <div className="text-slate-500 text-sm">deployment time</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-white mb-1">99.9%</div>
-              <div className="text-slate-500 text-sm">uptime SLA</div>
-            </div>
+            {[
+              {
+                icon: '🔒',
+                title: 'Private',
+                subtitle: 'Your own server',
+                description:
+                  'Your data never leaves your machine. Dedicated infrastructure, zero shared resources, full SSH access.',
+                accent: 'from-cyan-500/20 to-cyan-500/5',
+                border: 'border-cyan-500/20',
+              },
+              {
+                icon: '⚡',
+                title: 'Powerful',
+                subtitle: 'Claude, GPT, Gemini',
+                description:
+                  'Plug in any AI model. Anthropic, OpenAI, OpenRouter - or start free with our included tier.',
+                accent: 'from-blue-500/20 to-blue-500/5',
+                border: 'border-blue-500/20',
+              },
+              {
+                icon: '🔗',
+                title: 'Connected',
+                subtitle: 'Slack, Telegram, Discord',
+                description:
+                  'Meet your agent where you already are. Connects to every messaging platform you use.',
+                accent: 'from-purple-500/20 to-purple-500/5',
+                border: 'border-purple-500/20',
+              },
+            ].map((card, i) => (
+              <div
+                key={i}
+                className={`glass rounded-2xl p-7 border ${card.border} bg-gradient-to-b ${card.accent} hover:scale-[1.02] transition-transform duration-200`}
+              >
+                <div className="text-4xl mb-4">{card.icon}</div>
+                <h3 className="text-xl font-bold text-white mb-1">{card.title}</h3>
+                <p className="text-sm text-cyan-400/80 font-medium mb-3">{card.subtitle}</p>
+                <p className="text-slate-400 text-sm leading-relaxed">{card.description}</p>
+              </div>
+            ))}
           </div>
         </div>
       </main>
 
-      {/* ── Features ────────────────────────────────────────────────────── */}
-      <section className="relative z-10 px-6 py-20">
-        <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-6">
-          {[
-            {
-              icon: '🛡️',
-              title: 'Dedicated Instances',
-              description: 'Your own server, your own data. No shared infrastructure, complete isolation.',
-            },
-            {
-              icon: '⚡',
-              title: 'Instant Deployment',
-              description: 'From signup to live agent in under 5 minutes. Automated setup, zero DevOps required.',
-            },
-            {
-              icon: '🔐',
-              title: 'Enterprise Security',
-              description: 'SOC 2 ready architecture, end-to-end encryption, audit logging included.',
-            },
-          ].map((feature, i) => (
-            <div
-              key={i}
-              className="glass rounded-2xl p-6 hover:border-cyan-500/50 transition-colors group"
-            >
-              <div className="text-4xl mb-4">{feature.icon}</div>
-              <h3 className="text-xl font-semibold text-white mb-2 group-hover:text-cyan-400 transition-colors">
-                {feature.title}
-              </h3>
-              <p className="text-slate-400">{feature.description}</p>
-            </div>
-          ))}
+      {/* Stats bar */}
+      <section className="relative z-10 border-t border-slate-800/60 py-12 px-6">
+        <div className="max-w-4xl mx-auto grid grid-cols-3 gap-8 text-center">
+          <div>
+            <div className="text-3xl font-bold text-white mb-1">$10</div>
+            <div className="text-slate-500 text-sm">per month</div>
+          </div>
+          <div>
+            <div className="text-3xl font-bold text-white mb-1">&lt;5 min</div>
+            <div className="text-slate-500 text-sm">to deploy</div>
+          </div>
+          <div>
+            <div className="text-3xl font-bold text-white mb-1">100%</div>
+            <div className="text-slate-500 text-sm">your data</div>
+          </div>
         </div>
       </section>
 
-      {/* ── Footer ──────────────────────────────────────────────────────── */}
+      {/* Bottom CTA */}
+      <section className="relative z-10 py-20 px-6 text-center">
+        <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+          Ready to meet your agent?
+        </h2>
+        <p className="text-slate-400 mb-8 max-w-lg mx-auto">
+          Takes 5 minutes. No technical skills needed. Your AI will help you set up everything else.
+        </p>
+        <Link
+          href="/onboarding"
+          className="group inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-semibold text-lg hover:shadow-xl hover:shadow-cyan-500/30 transition-all"
+        >
+          Get Started Free
+          <span className="transition-transform group-hover:translate-x-1">→</span>
+        </Link>
+      </section>
+
+      {/* Footer */}
       <footer className="relative z-10 border-t border-slate-800/60 px-6 py-8 lg:px-12">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <span className="text-slate-600 text-sm font-mono">
-            Deep Signal Platform · © {new Date().getFullYear()}
+            Deep Signal Platform · {new Date().getFullYear()}
           </span>
           <div className="flex items-center gap-6 text-sm">
-            <Link href="/support" className="text-slate-500 hover:text-cyan-400 transition-colors font-mono">
-              support terminal →
+            <Link href="/support" className="text-slate-500 hover:text-cyan-400 transition-colors">
+              Support
             </Link>
             <Link href="/dashboard" className="text-slate-500 hover:text-white transition-colors">
               Dashboard
