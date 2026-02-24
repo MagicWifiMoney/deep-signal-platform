@@ -27,3 +27,19 @@
 - No external dependencies added
 
 **Commit:** bc0856c
+
+## 2026-02-24 06:00 - Keyboard Shortcuts
+
+**What:** Added keyboard navigation to the onboarding wizard. Enter advances to the next step, Escape goes back. A subtle "press Enter" hint appears below the Continue button on desktop.
+
+**Why:** Power users (and impatient people) shouldn't have to reach for the mouse between steps. Makes the whole wizard feel snappier and more polished - like a real product, not a form. The hint teaches the shortcut without being annoying, and hides on mobile where it's irrelevant.
+
+**Details:**
+- Enter fires handleNext() only when canProceed() is true and not on last step
+- Escape goes back one step (only when step > 0)
+- Both are suppressed when focus is on an input/textarea/select (so typing still works)
+- Both are suppressed during and after deploy
+- "press Enter" hint is hidden on mobile (sm:block)
+- No new dependencies
+
+**Commit:** 9e6ad09
