@@ -105,3 +105,18 @@
 - Mobile works identically
 
 **Commit:** e714ba2
+
+## 2026-02-24 15:00 - Conversation Starters on Success Page
+
+**What:** Added 3 clickable "Say something to get started" prompt cards to the post-deploy success page, between the instance details card and the share buttons.
+
+**Why:** 5 deployed instances, 0 messages. Classic cold-start problem - users deploy successfully but face a blank chat interface and don't know what to say first. This bridges the deploy→first-chat gap with zero friction.
+
+**Details:**
+- 3 prompts: intro/capability showcase, live web search, automation offer
+- Click copies text to clipboard AND opens agent in new tab simultaneously
+- Cards animate to green "Copied! Paste it in your agent →" state on click
+- Same UX pattern as existing copy-link button (familiar interaction)
+- No new dependencies
+
+**Commit:** 543e4dc
