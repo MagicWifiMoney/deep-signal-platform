@@ -780,6 +780,16 @@ export async function POST(request: Request) {
       }
     }
 
+    // Ping the onboarding agent to check this instance ASAP
+    try {
+      await fetch('https://dsconfig.jgiebz.com/trigger-onboarding', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ds-config-secret-2026' },
+        body: JSON.stringify({ hostname, ip: serverIp, domain, slug }),
+        signal: AbortSignal.timeout(3000),
+      }).catch(() => {}); // fire-and-forget
+    } catch { /* ignore */ }
+
     return NextResponse.json({
       success: true,
       instance: {

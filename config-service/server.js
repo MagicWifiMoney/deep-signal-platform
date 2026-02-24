@@ -372,6 +372,40 @@ app.get('/instance-status/:domain', authMiddleware, async (req, res) => {
   }
 });
 
+// ── Trigger onboarding agent immediately ──────────────────────────────────────
+app.post('/trigger-onboarding', async (req, res) => {
+  if (req.headers.authorization !== `Bearer ${AUTH_TOKEN}`) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { hostname, ip, domain, slug } = req.body;
+  console.log(`[trigger-onboarding] New instance: ${hostname} (${ip}) → ${domain}`);
+
+  // Run the onboarding agent immediately via cron wake
+  try {
+    const { execSync } = require('child_process');
+    // Wake the gateway to trigger the onboarding agent cron
+    execSync('openclaw cron wake --text "New instance deployed: ' + (hostname || 'unknown') + ' at ' + (ip || 'unknown') + '. Run onboarding checks immediately." --mode now', {
+      timeout: 5000,
+      stdio: 'pipe',
+    });
+    res.json({ ok: true, message: 'Onboarding agent triggered' });
+  } catch (error) {
+    console.error('[trigger-onboarding] Wake failed, trying direct cron run:', error.message);
+    // Fallback: directly run the onboarding cron
+    try {
+      const { execSync } = require('child_process');
+      execSync('openclaw cron run cd07f4b8-bdee-4066-920e-88a6ea611806', {
+        timeout: 5000,
+        stdio: 'pipe',
+      });
+      res.json({ ok: true, message: 'Onboarding cron triggered directly' });
+    } catch (e2) {
+      res.json({ ok: false, message: 'Trigger attempted', error: e2.message });
+    }
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Deep Signal Config Service running on port ${PORT}`);
 });
