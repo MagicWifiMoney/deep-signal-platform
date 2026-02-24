@@ -73,11 +73,10 @@ interface OnboardingData {
 // ── Provider config map ────────────────────────────────────────────────────────
 const providerConfigs = {
   free: {
-    model: 'google/gemini-2.0-flash',
-    env: 'GEMINI_API_KEY',
+    model: 'anthropic/claude-sonnet-4-6',
+    env: 'ANTHROPIC_API_KEY',
     providers: {},
   },
-  // MiniMax available but using Gemini Flash for free tier (more reliable)
   anthropic: {
     model: 'anthropic/claude-sonnet-4-6',
     env: 'ANTHROPIC_API_KEY',
@@ -94,8 +93,8 @@ const providerConfigs = {
     providers: {},
   },
   later: {
-    model: 'google/gemini-2.0-flash',
-    env: 'GEMINI_API_KEY',
+    model: 'anthropic/claude-sonnet-4-6',
+    env: 'ANTHROPIC_API_KEY',
     providers: {},
   },
 };
@@ -312,7 +311,7 @@ export function generateCloudInit(data: OnboardingData, domain: string, token: s
   }
 
   // Determine the effective API key for config injection
-  const effectiveApiKeyForConfig = data.apiKey || (provider === 'free' || provider === 'later' ? process.env.GEMINI_API_KEY || '' : '');
+  const effectiveApiKeyForConfig = data.apiKey || (provider === 'free' || provider === 'later' ? process.env.ANTHROPIC_API_KEY || '' : '');
 
   // Build env object for openclaw.json
   const envConfig: Record<string, string> = {};
@@ -367,7 +366,7 @@ export function generateCloudInit(data: OnboardingData, domain: string, token: s
   const companyName = data.companyName || agentName;
 
   // API key: use user-provided key, or server-side Gemini key for free tier
-  const effectiveApiKey = data.apiKey || (provider === 'free' || provider === 'later' ? process.env.GEMINI_API_KEY || '' : '');
+  const effectiveApiKey = data.apiKey || (provider === 'free' || provider === 'later' ? process.env.ANTHROPIC_API_KEY || '' : '');
 
   // API key environment line (only if we have one)
   // NOTE: kept only in systemd service file - NOT written to the log

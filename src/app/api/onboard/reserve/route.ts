@@ -60,9 +60,9 @@ async function createDnsRecord(subdomain: string, ip: string): Promise<void> {
 }
 
 function buildDefaultCloudInit(agentName: string, domain: string, token: string): string {
-  const geminiKey = process.env.GEMINI_API_KEY || '';
+  const anthropicKey = process.env.ANTHROPIC_API_KEY || '';
   const openclawConfig = JSON.stringify({
-    agents: { defaults: { model: { primary: 'google/gemini-2.0-flash' } } },
+    agents: { defaults: { model: { primary: 'anthropic/claude-sonnet-4-6' } } },
     gateway: {
       mode: 'local',
       bind: 'lan',
@@ -74,7 +74,7 @@ function buildDefaultCloudInit(agentName: string, domain: string, token: string)
         allowInsecureAuth: true,
       },
     },
-    env: geminiKey ? { GEMINI_API_KEY: geminiKey } : {},
+    env: anthropicKey ? { ANTHROPIC_API_KEY: anthropicKey } : {},
     skills: {
       entries: {
         weather: { enabled: true },
