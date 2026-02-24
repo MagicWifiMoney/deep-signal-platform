@@ -381,8 +381,10 @@ export function generateCloudInit(data: OnboardingData, domain: string, token: s
 - Draft content, emails, documents
 - Monitor websites
 - Manage your own config and channel settings
-- Install new skills: tell me "install the X skill" or run \`clawhub install <name>\`
+- Install new skills by running: \`openclaw config set skills.entries.<skill-name> '{"enabled":true}' --json\` then restart with \`openclaw gateway restart\`
 - Browse available skills at https://clawhub.com
+- Common skills: weather, web-search, github, google-workspace (gog), nano-banana-pro (image gen), perplexity (research)
+- To list what's already installed: \`openclaw config get skills\`
 ${selectedSkills.length > 0 ? `\n## Pre-installed Skills\n${selectedSkills.map(id => `- ${skillIdToName[id] || id}`).join('\\n')}\n` : ''}
 ## Rules
 - Be proactive - suggest things, don't wait to be asked
