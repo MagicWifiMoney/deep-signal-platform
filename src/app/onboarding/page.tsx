@@ -1261,12 +1261,36 @@ function OnboardingContent() {
                   </svg>
                 </div>
                 <h2 className="text-3xl font-bold text-white mb-2">
-                  {form.agentName || 'Your agent'} is deploying!
+                  {form.agentName || 'Your agent'} is live!
                 </h2>
-                <p className="text-slate-400">
-                  Your server is booting up now. Takes about 2 minutes - pick how you want to chat while it finishes.
-                </p>
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse inline-block flex-shrink-0" />
+                  Booting up (~2 min) - chat opens when ready
+                </div>
               </div>
+
+              {/* PRIMARY CTA - Chat with Your Agent */}
+              <a
+                href={agentUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group block w-full mb-8"
+              >
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-emerald-500 to-green-600 p-px shadow-2xl shadow-emerald-500/30 hover:shadow-emerald-500/50 transition-all">
+                  <div className="rounded-2xl bg-gradient-to-r from-emerald-500 to-green-600 px-6 py-5 flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className="w-14 h-14 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
+                        <span className="text-3xl">💬</span>
+                      </div>
+                      <div>
+                        <div className="text-xl font-bold text-white">Chat with {form.agentName || 'Your Agent'}</div>
+                        <div className="text-emerald-100 text-sm mt-0.5">Open your web chat - it&apos;ll be ready in ~2 min</div>
+                      </div>
+                    </div>
+                    <span className="text-white text-2xl transition-transform group-hover:translate-x-1 flex-shrink-0">→</span>
+                  </div>
+                </div>
+              </a>
 
               {/* Gift mode share */}
               {!form.forSelf && (
@@ -1288,65 +1312,73 @@ function OnboardingContent() {
                 </div>
               )}
 
-              {/* How to chat - the main event */}
-              <div className="space-y-3 mb-6">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                  Choose how to chat
-                </p>
-
-                {/* Option 1: Web chat */}
-                <a
-                  href={agentUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-r from-emerald-500/10 to-green-500/10 border-2 border-emerald-500/30 hover:border-emerald-500/50 transition-all"
-                >
-                  <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
-                    <span className="text-2xl">💬</span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-white">Open Web Chat</div>
-                    <div className="text-sm text-slate-400">Chat in your browser - ready when server finishes booting</div>
-                  </div>
-                  <span className="text-emerald-400 transition-transform group-hover:translate-x-1 flex-shrink-0">→</span>
-                </a>
-
-                {/* Option 2: Telegram */}
-                <a
-                  href={telegramSetupUrl}
-                  className="group flex items-center gap-4 p-4 rounded-2xl bg-slate-800/50 border-2 border-slate-700 hover:border-blue-500/30 transition-all"
-                >
-                  <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center flex-shrink-0">
-                    <span className="text-2xl">✈️</span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-white">Set up Telegram</div>
-                    <div className="text-sm text-slate-400">Chat from your phone - 2 min setup with BotFather</div>
-                  </div>
-                  <span className="text-slate-500 transition-transform group-hover:translate-x-1 group-hover:text-blue-400 flex-shrink-0">→</span>
-                </a>
-
-                {/* Option 3: Discord */}
-                <button
-                  onClick={() => {
-                    const msg = `To connect Discord, open your web chat and tell your agent: "Set up Discord for me"`;
-                    navigator.clipboard?.writeText(msg);
-                    setCopiedStarter(10);
-                    setTimeout(() => setCopiedStarter(null), 2000);
-                  }}
-                  className="group flex items-center gap-4 p-4 rounded-2xl bg-slate-800/50 border-2 border-slate-700 hover:border-indigo-500/30 transition-all w-full text-left"
-                >
-                  <div className="w-12 h-12 rounded-xl bg-indigo-500/20 flex items-center justify-center flex-shrink-0">
-                    <span className="text-2xl">🎮</span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-white">
-                      {copiedStarter === 10 ? '✓ Instructions copied!' : 'Set up Discord'}
+              {/* Secondary: Connect more channels - collapsible */}
+              <details className="mb-4 group/channels">
+                <summary className="cursor-pointer list-none flex items-center justify-between p-4 rounded-2xl bg-slate-800/50 border border-slate-700 hover:border-slate-600 transition-colors select-none">
+                  <span className="font-medium text-white">📲 Want to connect more channels?</span>
+                  <svg className="w-4 h-4 text-slate-400 transition-transform group-open/channels:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </summary>
+                <div className="mt-2 space-y-2">
+                  {/* Telegram */}
+                  <a
+                    href={telegramSetupUrl}
+                    className="group flex items-center gap-4 p-4 rounded-xl bg-slate-800/40 border border-slate-700 hover:border-blue-500/40 transition-all"
+                  >
+                    <div className="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                      <span className="text-xl">✈️</span>
                     </div>
-                    <div className="text-sm text-slate-400">Ask your agent in web chat to set it up for you</div>
-                  </div>
-                </button>
-              </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-white text-sm">Telegram</div>
+                      <div className="text-xs text-slate-400">Chat from your phone - 2 min with BotFather</div>
+                    </div>
+                    <span className="text-slate-500 transition-transform group-hover:translate-x-1 group-hover:text-blue-400 flex-shrink-0 text-sm">→</span>
+                  </a>
+
+                  {/* Discord */}
+                  <button
+                    onClick={() => {
+                      const msg = `To connect Discord, open your web chat and tell your agent: "Set up Discord for me"`;
+                      navigator.clipboard?.writeText(msg);
+                      setCopiedStarter(10);
+                      setTimeout(() => setCopiedStarter(null), 2000);
+                    }}
+                    className="group flex items-center gap-4 p-4 rounded-xl bg-slate-800/40 border border-slate-700 hover:border-indigo-500/40 transition-all w-full text-left"
+                  >
+                    <div className="w-10 h-10 rounded-lg bg-indigo-500/20 flex items-center justify-center flex-shrink-0">
+                      <span className="text-xl">🎮</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-white text-sm">
+                        {copiedStarter === 10 ? '✓ Instructions copied!' : 'Discord'}
+                      </div>
+                      <div className="text-xs text-slate-400">Ask your agent in web chat to set it up</div>
+                    </div>
+                  </button>
+
+                  {/* Slack */}
+                  <button
+                    onClick={() => {
+                      const msg = `To connect Slack, open your web chat and tell your agent: "Set up Slack for me"`;
+                      navigator.clipboard?.writeText(msg);
+                      setCopiedStarter(11);
+                      setTimeout(() => setCopiedStarter(null), 2000);
+                    }}
+                    className="group flex items-center gap-4 p-4 rounded-xl bg-slate-800/40 border border-slate-700 hover:border-purple-500/40 transition-all w-full text-left"
+                  >
+                    <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center flex-shrink-0">
+                      <span className="text-xl">💬</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-white text-sm">
+                        {copiedStarter === 11 ? '✓ Instructions copied!' : 'Slack'}
+                      </div>
+                      <div className="text-xs text-slate-400">Drop it into your workspace</div>
+                    </div>
+                  </button>
+                </div>
+              </details>
 
               {/* Your agent details - collapsible */}
               <details className="mb-4">
