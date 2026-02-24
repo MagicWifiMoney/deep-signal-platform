@@ -517,7 +517,7 @@ ${apiKeyInjection}
 echo "[DS] Configuring Caddy..."
 cat > /etc/caddy/Caddyfile << 'EOFCADDY'
 ${domain} {
-    reverse_proxy localhost:3000
+    reverse_proxy 127.0.0.1:3000
 }
 EOFCADDY
 
