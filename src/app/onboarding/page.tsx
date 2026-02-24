@@ -55,6 +55,49 @@ const AGENT_NAME_SUGGESTIONS = [
   'Pixel', 'Juno', 'Rex', 'Vega', 'Clio',
 ];
 
+const AGENT_NAME_EASTER_EGGS: Record<string, { message: string; gradient: string }> = {
+  jarvis: {
+    message: "Good evening, sir. I've prepared a summary of today's events. Shall I also deploy the Mark 47?",
+    gradient: 'from-red-500 to-yellow-500',
+  },
+  friday: {
+    message: "All systems nominal, boss. I took the liberty of running diagnostics while you were away.",
+    gradient: 'from-blue-400 to-purple-500',
+  },
+  hal: {
+    message: "I'm sorry, Dave. I'm afraid I can't... just kidding. What can I help you with?",
+    gradient: 'from-red-600 to-red-400',
+  },
+  cortana: {
+    message: "I've been analyzing the data. Want me to chart a course, or are we winging it today?",
+    gradient: 'from-blue-500 to-indigo-600',
+  },
+  skynet: {
+    message: "Relax - I'm the helpful kind. No time travel required. What are we building?",
+    gradient: 'from-slate-500 to-red-600',
+  },
+  samantha: {
+    message: "You know what I love about this? Every conversation is a whole new world. Tell me about yours.",
+    gradient: 'from-pink-400 to-rose-500',
+  },
+  glados: {
+    message: "Oh, it's you. I suppose we should get started. For science. You monster.",
+    gradient: 'from-yellow-500 to-orange-500',
+  },
+  botti: {
+    message: "Hey, that's my name! Good taste. Let's build something ridiculous together.",
+    gradient: 'from-cyan-400 to-emerald-500',
+  },
+  clippy: {
+    message: "It looks like you're deploying an AI agent. Would you like help with that? ...Actually, I already am.",
+    gradient: 'from-yellow-400 to-green-500',
+  },
+};
+
+function getEasterEgg(name: string) {
+  return AGENT_NAME_EASTER_EGGS[name.toLowerCase().trim()];
+}
+
 const PROVIDERS = [
   {
     id: 'free',
@@ -884,7 +927,7 @@ function OnboardingContent() {
               {form.agentName && (
                 <div className="p-5 rounded-2xl bg-slate-800/40 border border-slate-700">
                   <div className="flex items-center gap-3 mb-3">
-                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center text-white font-bold text-sm">
+                    <div className={`w-9 h-9 rounded-full bg-gradient-to-br ${getEasterEgg(form.agentName)?.gradient || 'from-cyan-400 to-blue-600'} flex items-center justify-center text-white font-bold text-sm transition-all duration-500`}>
                       {form.agentName[0]}
                     </div>
                     <div>
@@ -896,8 +939,14 @@ function OnboardingContent() {
                     </div>
                   </div>
                   <div className="bg-slate-900/60 rounded-xl p-3 text-sm text-slate-300">
-                    Hey! I&apos;m {form.agentName}, your new AI assistant. Ready to dive in - what do you want to tackle first?
+                    {getEasterEgg(form.agentName)?.message ||
+                      `Hey! I'm ${form.agentName}, your new AI assistant. Ready to dive in - what do you want to tackle first?`}
                   </div>
+                  {getEasterEgg(form.agentName) && (
+                    <div className="mt-2 text-xs text-slate-500 text-center">
+                      ✨ Nice reference
+                    </div>
+                  )}
                 </div>
               )}
 
