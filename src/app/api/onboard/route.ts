@@ -531,36 +531,88 @@ ${openclawConfig}
 EOFFIX
 fi
 
+echo "[DS] Verifying config integrity..."
+# Ensure critical auth fields survived the heredoc write
+CONFIG_OK=true
+if ! python3 -c "
+import json, sys
+cfg = json.load(open('/root/.openclaw/openclaw.json'))
+gw = cfg.get('gateway', {})
+auth = gw.get('auth', {})
+cui = gw.get('controlUi', {})
+errors = []
+if not auth.get('token'):
+    errors.append('gateway.auth.token is missing or empty')
+if not cui.get('dangerouslyDisableDeviceAuth'):
+    errors.append('controlUi.dangerouslyDisableDeviceAuth is not true')
+if not cui.get('dangerouslyAllowHostHeaderOriginFallback'):
+    errors.append('controlUi.dangerouslyAllowHostHeaderOriginFallback is not true')
+if gw.get('mode') != 'local':
+    errors.append('gateway.mode is not local')
+if errors:
+    for e in errors: print(f'[DS] CONFIG ERROR: {e}', file=sys.stderr)
+    sys.exit(1)
+print('[DS] Config integrity OK - auth token present, device auth disabled, origin fallback enabled')
+" 2>&1; then
+  echo "[DS] ERROR: Config integrity check failed - attempting repair..."
+  # Re-write config from scratch
+  cat > /root/.openclaw/openclaw.json << 'EOFREPAIR'
+${openclawConfig}
+EOFREPAIR
+  CONFIG_OK=false
+fi
+
 echo "[DS] Starting services..."
 systemctl daemon-reload
 systemctl enable openclaw
 systemctl start openclaw
 
-# Health check - verify OpenClaw actually started
+# Health check - verify OpenClaw WebSocket actually responds
 echo "[DS] Waiting for OpenClaw to start..."
-for i in 1 2 3 4 5 6; do
+OPENCLAW_READY=false
+for i in 1 2 3 4 5 6 7 8; do
   sleep 5
-  if systemctl is-active --quiet openclaw; then
-    echo "[DS] OpenClaw is running (attempt $i)"
-    break
-  fi
-  if [ "$i" = "6" ]; then
-    echo "[DS] WARNING: OpenClaw failed to start after 30s"
-    echo "[DS] Checking logs..."
-    journalctl -u openclaw --no-pager -n 20
-    # Try restarting once
-    systemctl restart openclaw
-    sleep 5
-    if systemctl is-active --quiet openclaw; then
-      echo "[DS] OpenClaw started after retry"
-    else
-      echo "[DS] ERROR: OpenClaw still not running - needs manual intervention"
+  if ! systemctl is-active --quiet openclaw; then
+    echo "[DS] OpenClaw not running yet (attempt $i/8)"
+    if [ "$i" = "4" ]; then
+      echo "[DS] Restarting OpenClaw..."
+      journalctl -u openclaw --no-pager -n 10
+      systemctl restart openclaw
     fi
+    continue
+  fi
+  # Verify the WebSocket port is actually listening
+  if curl -sf -o /dev/null --max-time 3 http://127.0.0.1:3000/ 2>/dev/null; then
+    echo "[DS] OpenClaw is running and responding on port 3000 (attempt $i)"
+    OPENCLAW_READY=true
+    break
+  else
+    echo "[DS] OpenClaw service active but port 3000 not responding yet (attempt $i/8)"
   fi
 done
 
+if [ "$OPENCLAW_READY" = "false" ]; then
+  echo "[DS] WARNING: OpenClaw may not be fully ready"
+  journalctl -u openclaw --no-pager -n 20
+fi
+
+echo "[DS] Starting Caddy and provisioning TLS..."
 systemctl enable caddy
 systemctl restart caddy
+
+# Pre-warm TLS certificate - Caddy provisions on first request
+# This ensures the cert is ready before the user clicks their dashboard link
+echo "[DS] Triggering TLS certificate provisioning..."
+for i in 1 2 3 4 5 6; do
+  sleep 5
+  HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" --max-time 10 "https://${domain}/" 2>/dev/null || echo "000")
+  if [ "$HTTP_CODE" != "000" ]; then
+    echo "[DS] TLS ready - HTTPS responding with HTTP $HTTP_CODE (attempt $i)"
+    break
+  else
+    echo "[DS] TLS not ready yet (attempt $i/6) - Caddy may still be provisioning certificate"
+  fi
+done
 
 echo "[DS] Bootstrap complete!"
 echo "[DS] Dashboard: https://${domain}"
