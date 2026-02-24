@@ -340,6 +340,7 @@ export function generateCloudInit(data: OnboardingData, domain: string, token: s
         dangerouslyDisableDeviceAuth: true,
         allowInsecureAuth: true,
       },
+      trustedProxies: ['127.0.0.1', '::1'],
     },
     env: envConfig,
     skills: {

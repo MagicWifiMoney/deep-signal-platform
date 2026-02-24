@@ -73,6 +73,7 @@ function buildDefaultCloudInit(agentName: string, domain: string, token: string)
         dangerouslyDisableDeviceAuth: true,
         allowInsecureAuth: true,
       },
+      trustedProxies: ['127.0.0.1', '::1'],
     },
     env: anthropicKey ? { ANTHROPIC_API_KEY: anthropicKey } : {},
     skills: {
