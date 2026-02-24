@@ -696,34 +696,38 @@ function OnboardingContent() {
     setTimeout(() => handleDeploy(), 100);
   };
 
+  const finishDeploy = () => {
+    setDeployProgress(100);
+    setDeployDone(true);
+    setIsDeploying(false);
+    setTimeout(() => setShowConfetti(true), 200);
+    setTimeout(() => setShowConfetti(false), 5000);
+  };
+
   const pollStatus = async (serverId: number, domain: string) => {
     let attempts = 0;
-    const max = 90;
+    const max = 40; // ~2 min max wait
 
     const poll = async () => {
       attempts++;
+      // Animate progress from 95 to 99 during polling
+      setDeployProgress(Math.min(99, 95 + Math.floor(attempts * 0.1)));
       try {
-        const res = await fetch(`/api/onboard?id=${serverId}&domain=${encodeURIComponent(domain)}`);
+        const controller = new AbortController();
+        setTimeout(() => controller.abort(), 8000);
+        const res = await fetch(`/api/onboard?id=${serverId}&domain=${encodeURIComponent(domain)}`, {
+          signal: controller.signal,
+        });
         const data = await res.json();
 
         if (data.openclawReady || attempts >= max) {
-          setDeployProgress(100);
-          setDeployDone(true);
-          setIsDeploying(false);
-          setTimeout(() => setShowConfetti(true), 200);
-          setTimeout(() => setShowConfetti(false), 5000);
+          finishDeploy();
         } else {
           setTimeout(poll, 3000);
         }
       } catch {
         if (attempts < max) setTimeout(poll, 3000);
-        else {
-          setDeployProgress(100);
-          setDeployDone(true);
-          setIsDeploying(false);
-          setTimeout(() => setShowConfetti(true), 200);
-          setTimeout(() => setShowConfetti(false), 5000);
-        }
+        else finishDeploy();
       }
     };
 
@@ -1455,6 +1459,16 @@ function OnboardingContent() {
                   </div>
                 ))}
               </div>
+
+              {/* Skip waiting - shows after 30 seconds */}
+              {deployProgress >= 96 && (
+                <button
+                  onClick={finishDeploy}
+                  className="mt-8 text-sm text-slate-500 hover:text-slate-300 transition-colors underline underline-offset-4"
+                >
+                  Server is ready - skip waiting →
+                </button>
+              )}
             </div>
           );
         }
