@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-// import { UserButton } from '@clerk/nextjs';
+
 import { getSettings, saveSettings } from '@/lib/store';
 
 interface Message {
