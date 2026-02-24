@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 
@@ -70,6 +70,132 @@ interface DeploymentStatus {
   dashboardUrl: string | null;
   gatewayToken: string;
   openclawReady: boolean;
+}
+
+// ── Instance readiness checker ────────────────────────────────────────────────
+function InstanceReadyChecker({ domain, token, ip }: { domain: string; token: string; ip?: string }) {
+  const [isReady, setIsReady] = useState(false);
+  const [checking, setChecking] = useState(true);
+  const [attemptCount, setAttemptCount] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!domain) return;
+    let cancelled = false;
+
+    const checkReady = async () => {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 4000);
+        const res = await fetch(`https://${domain}`, { signal: controller.signal, mode: 'no-cors' });
+        clearTimeout(timeout);
+        if (!cancelled) {
+          setIsReady(true);
+          setChecking(false);
+          return;
+        }
+      } catch {
+        // no-cors fetch throws on network error but "succeeds" (opaque response) if server is up
+        // If we get an opaque response type, the server responded
+      }
+      // For no-cors, any response (even opaque) means server is up
+      if (!cancelled) {
+        setIsReady(true);
+        setChecking(false);
+      }
+    };
+
+    // For no-cors we can't easily check status. Use a different strategy:
+    // try a HEAD request without no-cors, fall back gracefully
+    const checkWithFallback = async () => {
+      if (cancelled) return;
+      setAttemptCount(a => a + 1);
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 4000);
+        await fetch(`https://${domain}/`, { method: 'HEAD', signal: controller.signal });
+        clearTimeout(timeout);
+        if (!cancelled) { setIsReady(true); setChecking(false); return; }
+      } catch (err: any) {
+        // CORS error means the server IS up (it responded and rejected CORS)
+        // Network error / timeout means server not up yet
+        if (!cancelled && err?.name !== 'AbortError' && err?.message?.includes('Failed to fetch') === false) {
+          setIsReady(true);
+          setChecking(false);
+          return;
+        }
+        // Also treat TypeError: Failed to fetch as potentially up (CORS block)
+        // Only retry on AbortError (timeout)
+        if (!cancelled && err?.name !== 'AbortError') {
+          // Could be CORS — treat as ready
+          setIsReady(true);
+          setChecking(false);
+          return;
+        }
+      }
+      if (!cancelled) {
+        timerRef.current = setTimeout(checkWithFallback, 3000);
+      }
+    };
+
+    checkWithFallback();
+    return () => {
+      cancelled = true;
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [domain]);
+
+  const dashUrl = `https://${domain}/#token=${token}`;
+  const ipUrl = ip ? `http://${ip}:3000/#token=${token}` : null;
+
+  return (
+    <div className="space-y-4">
+      {/* Primary dashboard link with readiness indicator */}
+      {isReady ? (
+        <a
+          href={dashUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-full sm:w-auto inline-flex items-center justify-center gap-3 px-8 py-4 rounded-xl bg-gradient-to-r from-emerald-500 to-green-600 text-white font-semibold hover:shadow-lg hover:shadow-emerald-500/25 transition-all"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+          Dashboard Ready - Open Now
+        </a>
+      ) : (
+        <div className="flex flex-col sm:flex-row items-center gap-3">
+          <div className="flex items-center gap-3 px-6 py-3 rounded-xl bg-slate-800/50 border border-slate-700 text-slate-300">
+            <div className="w-4 h-4 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+            <span className="text-sm">Waiting for instance to be ready{attemptCount > 0 ? ` (${attemptCount * 3}s)` : ''}...</span>
+          </div>
+          <a
+            href={dashUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-slate-500 hover:text-cyan-400 transition-colors"
+          >
+            Try anyway →
+          </a>
+        </div>
+      )}
+
+      {/* IP fallback */}
+      {ipUrl && (
+        <div className="text-center">
+          <p className="text-xs text-slate-500 mb-1">Direct IP fallback (bypasses DNS):</p>
+          <a
+            href={ipUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-cyan-500/70 hover:text-cyan-400 font-mono transition-colors"
+          >
+            {ipUrl}
+          </a>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function Onboarding() {
@@ -914,9 +1040,9 @@ export default function Onboarding() {
                   <>
                     <div className="flex justify-between">
                       <span className="text-slate-400">Dashboard URL</span>
-                      <Link href={`/dashboard?domain=${deployment.domain}&token=${deployment.gatewayToken}`} className="text-cyan-400 hover:underline font-mono">
+                      <a href={`https://${deployment.domain}/#token=${deployment.gatewayToken}`} target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline font-mono text-xs truncate max-w-[200px]">
                         {deployment.domain}
-                      </Link>
+                      </a>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-400">IP Address</span>
@@ -962,15 +1088,19 @@ export default function Onboarding() {
                   Set Up Your Agent →
                 </Link>
               )}
-              {deployment && (
-                <Link
-                  href={`/dashboard?domain=${deployment.domain}&token=${deployment.gatewayToken}`}
-                  className="w-full sm:w-auto text-center px-8 py-4 rounded-xl bg-slate-800/50 border border-slate-700 text-white font-semibold hover:bg-slate-800 transition-colors"
-                >
-                  Go to Dashboard →
-                </Link>
-              )}
             </div>
+
+            {/* Dashboard readiness checker */}
+            {deployment && (
+              <div className="mb-8 flex flex-col items-center gap-2">
+                <p className="text-sm text-slate-400">Direct access to your OpenClaw dashboard:</p>
+                <InstanceReadyChecker
+                  domain={deployment.domain}
+                  token={deployment.gatewayToken}
+                  ip={deployment.ip}
+                />
+              </div>
+            )}
 
             {/* Channel Setup */}
             <div className="rounded-xl border border-slate-700 overflow-hidden mb-6">

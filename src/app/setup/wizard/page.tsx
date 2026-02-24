@@ -121,6 +121,11 @@ function ChannelsStep({
   const [telegramError, setTelegramError] = useState<string | null>(null);
   const [telegramExpanded, setTelegramExpanded] = useState(false);
 
+  const [slackToken, setSlackToken] = useState('');
+  const [slackLoading, setSlackLoading] = useState(false);
+  const [slackError, setSlackError] = useState<string | null>(null);
+  const [slackExpanded, setSlackExpanded] = useState(false);
+
   const embedCode = `<script src="https://${params.domain}/webchat.js" data-token="${params.token}"></script>`;
   const [embedCopied, setEmbedCopied] = useState(false);
 
@@ -129,6 +134,34 @@ function ChannelsStep({
     setEmbedCopied(true);
     setTimeout(() => setEmbedCopied(false), 2000);
     onConnected('webchat');
+  };
+
+  const configureSlack = async () => {
+    if (!slackToken.trim()) return;
+    setSlackLoading(true);
+    setSlackError(null);
+    try {
+      const res = await fetch(`${CONFIG_SERVICE}/configure-slack`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${CONFIG_API_SECRET}`,
+        },
+        body: JSON.stringify({
+          domain: params.domain,
+          gatewayToken: params.token,
+          slackBotToken: slackToken.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Configuration failed');
+      onConnected('slack');
+      setSlackExpanded(false);
+    } catch (err: any) {
+      setSlackError(err.message);
+    } finally {
+      setSlackLoading(false);
+    }
   };
 
   const configureTelegram = async () => {
@@ -171,14 +204,17 @@ function ChannelsStep({
       <div className="space-y-4">
         {/* Slack */}
         <div className="rounded-xl border border-slate-700 overflow-hidden">
-          <div className="p-5 flex items-center justify-between">
+          <button
+            onClick={() => setSlackExpanded(!slackExpanded)}
+            className="w-full p-5 flex items-center justify-between hover:bg-slate-800/30 transition-colors"
+          >
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-xl bg-[#4A154B] flex items-center justify-center flex-shrink-0">
                 <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zM15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z"/>
                 </svg>
               </div>
-              <div>
+              <div className="text-left">
                 <div className="font-semibold text-white">Slack</div>
                 <div className="text-sm text-slate-400">Add {params.name} to your Slack workspace</div>
               </div>
@@ -191,20 +227,59 @@ function ChannelsStep({
                 Connected
               </span>
             ) : (
-              <Link
-                href={`/setup/slack?domain=${params.domain}&token=${params.token}`}
-                className="px-4 py-2 rounded-lg bg-[#4A154B] text-white text-sm font-medium hover:bg-[#611f69] transition-colors flex items-center gap-2"
-              >
-                <svg viewBox="0 0 122.8 122.8" className="w-4 h-4" fill="currentColor">
-                  <path d="M25.8 77.6c0 7.1-5.8 12.9-12.9 12.9S0 84.7 0 77.6s5.8-12.9 12.9-12.9h12.9v12.9zm6.5 0c0-7.1 5.8-12.9 12.9-12.9s12.9 5.8 12.9 12.9v32.3c0 7.1-5.8 12.9-12.9 12.9s-12.9-5.8-12.9-12.9V77.6z" fill="#E01E5A"/>
-                  <path d="M45.2 25.8c-7.1 0-12.9-5.8-12.9-12.9S38.1 0 45.2 0s12.9 5.8 12.9 12.9v12.9H45.2zm0 6.5c7.1 0 12.9 5.8 12.9 12.9s-5.8 12.9-12.9 12.9H12.9C5.8 58.1 0 52.3 0 45.2s5.8-12.9 12.9-12.9h32.3z" fill="#36C5F0"/>
-                  <path d="M97 45.2c0-7.1 5.8-12.9 12.9-12.9s12.9 5.8 12.9 12.9-5.8 12.9-12.9 12.9H97V45.2zm-6.5 0c0 7.1-5.8 12.9-12.9 12.9s-12.9-5.8-12.9-12.9V12.9C64.7 5.8 70.5 0 77.6 0s12.9 5.8 12.9 12.9v32.3z" fill="#2EB67D"/>
-                  <path d="M77.6 97c7.1 0 12.9 5.8 12.9 12.9s-5.8 12.9-12.9 12.9-12.9-5.8-12.9-12.9V97h12.9zm0-6.5c-7.1 0-12.9-5.8-12.9-12.9s5.8-12.9 12.9-12.9h32.3c7.1 0 12.9 5.8 12.9 12.9s-5.8 12.9-12.9 12.9H77.6z" fill="#ECB22E"/>
-                </svg>
-                Add to Slack
-              </Link>
+              <svg className={`w-5 h-5 text-slate-400 transition-transform ${slackExpanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
             )}
-          </div>
+          </button>
+
+          {slackExpanded && !connected.slack && (
+            <div className="px-5 pb-5 border-t border-slate-700 pt-4">
+              <div className="space-y-4">
+                <div className="p-4 rounded-lg bg-slate-800/50">
+                  <p className="text-sm font-medium text-white mb-2">Setup instructions:</p>
+                  <ol className="text-sm text-slate-400 space-y-1 list-decimal list-inside">
+                    <li>Go to <a href="https://api.slack.com/apps" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline">api.slack.com/apps</a> and create a new app</li>
+                    <li>Add OAuth scopes: <span className="text-cyan-400 font-mono text-xs">chat:write, app_mentions:read, channels:history, im:read, im:write</span></li>
+                    <li>Install to workspace and copy the <span className="text-cyan-400 font-mono">Bot User OAuth Token</span></li>
+                    <li>Paste it below and click Connect</li>
+                  </ol>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">Bot Token</label>
+                  <input
+                    type="text"
+                    value={slackToken}
+                    onChange={(e) => setSlackToken(e.target.value)}
+                    placeholder="xoxb-..."
+                    className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-600 text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none transition-colors font-mono text-sm"
+                  />
+                </div>
+
+                {slackError && (
+                  <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-sm text-rose-400">
+                    {slackError}
+                  </div>
+                )}
+
+                <button
+                  onClick={configureSlack}
+                  disabled={!slackToken.trim() || slackLoading}
+                  className="w-full py-3 rounded-xl bg-[#4A154B] text-white font-medium hover:bg-[#611f69] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {slackLoading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Connecting...
+                    </span>
+                  ) : 'Connect Slack'}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Telegram */}
@@ -545,9 +620,82 @@ function TestStep({ params, onNext }: { params: WizardParams; onNext: () => void
   );
 }
 
+// ---- Instance readiness checker ----
+function InstanceReadyChecker({ domain, token }: { domain: string; token: string }) {
+  const [isReady, setIsReady] = useState(false);
+  const [attemptCount, setAttemptCount] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!domain) return;
+    let cancelled = false;
+
+    const checkWithFallback = async () => {
+      if (cancelled) return;
+      setAttemptCount(a => a + 1);
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 4000);
+        await fetch(`https://${domain}/`, { method: 'HEAD', signal: controller.signal });
+        clearTimeout(timeout);
+        if (!cancelled) { setIsReady(true); return; }
+      } catch (err: any) {
+        // CORS rejection = server is up
+        if (!cancelled && err?.name !== 'AbortError') {
+          setIsReady(true);
+          return;
+        }
+      }
+      if (!cancelled) {
+        timerRef.current = setTimeout(checkWithFallback, 3000);
+      }
+    };
+
+    checkWithFallback();
+    return () => {
+      cancelled = true;
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [domain]);
+
+  const dashUrl = `https://${domain}/#token=${token}`;
+
+  if (isReady) {
+    return (
+      <a
+        href={dashUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-3 px-10 py-4 rounded-xl bg-gradient-to-r from-emerald-500 to-green-600 text-white font-semibold text-lg hover:shadow-lg hover:shadow-emerald-500/25 transition-all"
+      >
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+        </svg>
+        Dashboard Ready - Open Now
+      </a>
+    );
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-3">
+      <div className="flex items-center gap-3 px-6 py-4 rounded-xl bg-slate-800/50 border border-slate-700 text-slate-300">
+        <div className="w-5 h-5 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+        <span className="text-sm">Waiting for instance{attemptCount > 0 ? ` (${attemptCount * 3}s)` : ''}...</span>
+      </div>
+      <a
+        href={dashUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-xs text-slate-500 hover:text-cyan-400 transition-colors"
+      >
+        Try opening anyway →
+      </a>
+    </div>
+  );
+}
+
 // ---- Step 4: Done ----
 function DoneStep({ params, connected }: { params: WizardParams; connected: ConnectedChannels }) {
-  const dashboardUrl = `/dashboard?domain=${params.domain}&token=${params.token}`;
   const channelCount = Object.values(connected).filter(Boolean).length;
 
   return (
@@ -635,12 +783,7 @@ function DoneStep({ params, connected }: { params: WizardParams; connected: Conn
         )}
       </div>
 
-      <Link
-        href={dashboardUrl}
-        className="inline-block px-10 py-4 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-semibold text-lg hover:shadow-lg hover:shadow-cyan-500/25 transition-all"
-      >
-        Go to Dashboard →
-      </Link>
+      <InstanceReadyChecker domain={params.domain} token={params.token} />
     </div>
   );
 }

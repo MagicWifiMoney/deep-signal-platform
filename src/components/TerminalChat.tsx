@@ -29,24 +29,36 @@ interface TerminalChatProps {
 // ─── Demo conversation for offline mode ──────────────────────────────────────
 
 const ONBOARDING_DEMO: ChatMessage[] = [
-  { id: 'd1', role: 'system', content: 'Agent offline — demo mode' },
-  { id: 'd2', role: 'system', content: 'This is a preview of the onboarding experience' },
-  { id: 'd3', role: 'agent', content: "Hey! I'm Signal — your setup assistant.\n\nI'm going to help you deploy your own AI agent in about 5 minutes.\nNo forms, no dashboards — just tell me about your company and I'll handle the rest.\n\nWhat's your company name?" },
-  { id: 'd4', role: 'user', content: 'Acme Corp' },
-  { id: 'd5', role: 'agent', content: "Nice, Acme Corp! What does your team primarily use this agent for?\n\n  [1] Customer support\n  [2] Internal knowledge base\n  [3] Sales / lead qualification\n  [4] Something else" },
-  { id: 'd6', role: 'user', content: '1' },
+  { id: 'd1', role: 'system', content: 'Deep Signal Terminal v2.0' },
+  { id: 'd2', role: 'system', content: 'Secure connection established' },
+  { id: 'd3', role: 'agent', content: "Hey! I'm Signal — your AI deployment assistant.\n\nI'll spin up your own private AI agent in under 5 minutes.\nDedicated server, your API keys, zero data sharing.\n\nWhat's your company name?" },
+  { id: 'd4', role: 'user', content: 'Northstar Marketing' },
   {
-    id: 'd7',
+    id: 'd5',
     role: 'executing',
-    content: 'Provisioning your instance...',
+    content: 'Analyzing northstarmarketing.com...',
     steps: [
-      { status: 'done', text: 'Reserved dedicated EC2 instance (us-east-2)' },
-      { status: 'done', text: 'Configured OpenClaw gateway' },
-      { status: 'done', text: 'Applied customer support persona' },
-      { status: 'running', text: 'Activating secure endpoints...' },
+      { status: 'done', text: 'Fetched company website content' },
+      { status: 'done', text: 'Identified: B2B marketing agency, 12-person team' },
+      { status: 'done', text: 'Detected ideal use case: client onboarding + support' },
+      { status: 'done', text: 'Generated professional tone persona' },
     ],
   },
-  { id: 'd8', role: 'agent', content: "Your agent is live. 🚀\n\nAccess it at: https://acme-corp.deep-signal.app\nGateway token: sk-ds-••••••••••••••••\n\nReady to configure your first knowledge base?" },
+  { id: 'd6', role: 'agent', content: "Got it. Northstar Marketing — B2B agency.\n\nI'll configure your agent for client onboarding and support.\nProfessional tone, Claude Sonnet for quality responses.\n\nWhich channel should I activate first?\n\n  [1] Slack (for your team)\n  [2] Web chat widget (for clients)\n  [3] Telegram bot" },
+  { id: 'd7', role: 'user', content: '1' },
+  {
+    id: 'd8',
+    role: 'executing',
+    content: 'Deploying your dedicated instance...',
+    steps: [
+      { status: 'done', text: 'Provisioned Hetzner CPX21 (Ashburn, US)' },
+      { status: 'done', text: 'Installed OpenClaw gateway + Node 22' },
+      { status: 'done', text: 'Deployed Northstar persona + Slack plugin' },
+      { status: 'done', text: 'SSL certificate issued via Caddy' },
+      { status: 'done', text: 'Health check passed — agent responding' },
+    ],
+  },
+  { id: 'd9', role: 'agent', content: "Northstar's agent is live. 🚀\n\nDomain: northstar.ds.jgiebz.com\nSlack: add @Northstar to any channel\nToken: ds-••••••••\n\n$10.59/mo — your server, your data, full SSH access." },
 ];
 
 const SUPPORT_DEMO: ChatMessage[] = [
