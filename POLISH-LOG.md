@@ -13,3 +13,17 @@
 - Banner auto-dismisses after 4 seconds
 
 **Commit:** 2f4370d
+
+## 2026-02-24 05:00 - Share to X + Copy Link Buttons
+
+**What:** Added "Share on X" and "Copy link" buttons to the success page after deploy completes. The X button pre-fills a tweet with the agent name and link. The copy button shows a green "Copied!" confirmation for 2 seconds.
+
+**Why:** Viral loop - the moment someone deploys is peak excitement. Making it one click to share means free distribution. Copy link covers non-Twitter users who want to share via DM or Slack.
+
+**Details:**
+- X share uses twitter intent URL with pre-filled text + agent URL
+- Copy button flips to green checkmark + "Copied!" state for 2s
+- Both buttons sit below the instance details card
+- No external dependencies added
+
+**Commit:** bc0856c
