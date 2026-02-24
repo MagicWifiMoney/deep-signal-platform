@@ -1559,6 +1559,28 @@ function OnboardingContent() {
     setStep((s) => s + 1);
   };
 
+  // Keyboard shortcuts: Enter = next, Escape = back
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      // Skip when user is typing in an input or textarea
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      // Skip during deploy or after deploy
+      if (isDeploying || deployDone) return;
+
+      if (e.key === 'Enter' && !isLastStep && canProceed()) {
+        e.preventDefault();
+        handleNext();
+      } else if (e.key === 'Escape' && step > 0) {
+        e.preventDefault();
+        setStep((s) => s - 1);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, isDeploying, deployDone, form]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
       {/* Background blobs */}
@@ -1637,13 +1659,18 @@ function OnboardingContent() {
             )}
 
             {!isLastStep && (
-              <button
-                onClick={handleNext}
-                disabled={!canProceed()}
-                className="px-8 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-semibold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed min-h-[48px]"
-              >
-                Continue
-              </button>
+              <div className="flex flex-col items-end gap-1">
+                <button
+                  onClick={handleNext}
+                  disabled={!canProceed()}
+                  className="px-8 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-semibold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed min-h-[48px]"
+                >
+                  Continue
+                </button>
+                <span className="text-[11px] text-slate-600 hidden sm:block">
+                  press Enter ↵
+                </span>
+              </div>
             )}
           </div>
         </footer>
