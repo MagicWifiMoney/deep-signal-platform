@@ -521,10 +521,44 @@ ${domain} {
 }
 EOFCADDY
 
+echo "[DS] Validating OpenClaw config..."
+# Validate config is parseable JSON before starting
+if ! python3 -c "import json; json.load(open('/root/.openclaw/openclaw.json'))" 2>/dev/null; then
+  echo "[DS] ERROR: Invalid JSON in openclaw.json - fixing..."
+  # Re-write a minimal valid config
+  cat > /root/.openclaw/openclaw.json << 'EOFFIX'
+${openclawConfig}
+EOFFIX
+fi
+
 echo "[DS] Starting services..."
 systemctl daemon-reload
 systemctl enable openclaw
 systemctl start openclaw
+
+# Health check - verify OpenClaw actually started
+echo "[DS] Waiting for OpenClaw to start..."
+for i in 1 2 3 4 5 6; do
+  sleep 5
+  if systemctl is-active --quiet openclaw; then
+    echo "[DS] OpenClaw is running (attempt $i)"
+    break
+  fi
+  if [ "$i" = "6" ]; then
+    echo "[DS] WARNING: OpenClaw failed to start after 30s"
+    echo "[DS] Checking logs..."
+    journalctl -u openclaw --no-pager -n 20
+    # Try restarting once
+    systemctl restart openclaw
+    sleep 5
+    if systemctl is-active --quiet openclaw; then
+      echo "[DS] OpenClaw started after retry"
+    else
+      echo "[DS] ERROR: OpenClaw still not running - needs manual intervention"
+    fi
+  fi
+done
+
 systemctl enable caddy
 systemctl restart caddy
 

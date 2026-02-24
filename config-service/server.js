@@ -200,6 +200,9 @@ app.post('/configure-telegram', authMiddleware, async (req, res) => {
     config.channels.telegram = {
       enabled: true,
       botToken: telegramBotToken,
+      dmPolicy: 'open',
+      groupPolicy: 'allowlist',
+      streaming: 'off',
     };
     
     const newConfigStr = JSON.stringify(config, null, 2);
