@@ -325,6 +325,13 @@ curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /
 apt-get update
 apt-get install -y caddy
 
+echo "[DS] Installing 1Password CLI (OpenClaw dependency)..."
+curl -sS https://downloads.1password.com/linux/keys/1password.asc | gpg --dearmor --output /usr/share/keyrings/1password-archive-keyring.gpg
+echo "deb [arch=amd64 signed-by=/usr/share/keyrings/1password-archive-keyring.gpg] https://downloads.1password.com/linux/debian/amd64 stable main" | tee /etc/apt/sources.list.d/1password.list
+mkdir -p /etc/debsig/policies/AC2D62742012EA22/ /usr/share/debsig/keyrings/AC2D62742012EA22/
+curl -sS https://downloads.1password.com/linux/keys/1password.asc | gpg --dearmor --output /usr/share/debsig/keyrings/AC2D62742012EA22/debsig.gpg
+apt-get update && apt-get install -y 1password-cli || echo "[DS] 1password-cli install failed (non-critical, continuing)"
+
 echo "[DS] Installing OpenClaw..."
 npm install -g openclaw
 
@@ -635,23 +642,25 @@ export async function GET(request: Request) {
     let openclawReady = false;
 
     if (server.status === 'running' && ip) {
-      // Try IP first (faster, no DNS dependency)
-      try {
-        const controller = new AbortController();
-        setTimeout(() => controller.abort(), 5000);
-        const healthCheck = await fetch(`http://${ip}:3000/`, { signal: controller.signal });
-        openclawReady = healthCheck.ok;
-      } catch {
-        // Try domain
-        if (domain) {
-          try {
-            const controller2 = new AbortController();
-            setTimeout(() => controller2.abort(), 5000);
-            const healthCheck2 = await fetch(`https://${domain}`, { signal: controller2.signal });
-            openclawReady = healthCheck2.ok;
-          } catch {
-            openclawReady = false;
-          }
+      // Try multiple endpoints - cloud-init installs Caddy (HTTPS on 443) + OpenClaw (HTTP on 3000)
+      const checks = [
+        `http://${ip}:3000/`,
+        ...(domain ? [`https://${domain}`] : []),
+        `https://${ip}:443/`,
+      ];
+      for (const url of checks) {
+        if (openclawReady) break;
+        try {
+          const controller = new AbortController();
+          setTimeout(() => controller.abort(), 5000);
+          const healthCheck = await fetch(url, {
+            signal: controller.signal,
+            // @ts-expect-error Node fetch option to skip TLS verification for IP-based HTTPS
+            rejectUnauthorized: false,
+          });
+          openclawReady = healthCheck.ok;
+        } catch {
+          // try next
         }
       }
     }
