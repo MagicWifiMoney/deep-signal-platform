@@ -91,3 +91,17 @@
 - No external dependencies - pure React state machine
 
 **Commit:** 315122c
+
+## 2026-02-24 09:00 - Progressive Background Glow
+
+**What:** Background blobs now shift color as users progress through the 8 onboarding steps. Starts cyan/blue, moves through indigo/violet/purple/fuchsia, and lands on emerald/green at the deploy step. Colors transition smoothly over 1 second using inline styles (not Tailwind class swaps, which can't animate).
+
+**Why:** Subconscious sense of journey. Users feel like they're moving through something - not just clicking "next" on a form. The shift to green at deploy reinforces "you're about to launch." It's the kind of detail nobody notices consciously but everyone feels.
+
+**Details:**
+- 8-color palette mapped to each step
+- Inline `backgroundColor` with CSS `transition: background-color 1s ease`
+- No new dependencies, zero layout impact
+- Mobile works identically
+
+**Commit:** e714ba2
