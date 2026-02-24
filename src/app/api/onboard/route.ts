@@ -623,7 +623,23 @@ export async function POST(request: Request) {
   }
 
   try {
-    // Relaxed validation - API key optional for free/later providers
+    // Validation - require at least an agent name or company name
+    if (!data.agentName && !data.companyName) {
+      return NextResponse.json(
+        { error: 'Missing required field: agentName or companyName must be provided' },
+        { status: 400 }
+      );
+    }
+
+    // Validate channel if provided
+    const validChannels = ['web', 'telegram', 'discord', 'slack', 'whatsapp'];
+    if (data.channel && !validChannels.includes(data.channel)) {
+      return NextResponse.json(
+        { error: `Invalid channel: ${data.channel}. Must be one of: ${validChannels.join(', ')}` },
+        { status: 400 }
+      );
+    }
+
     const agentName = data.agentName || data.companyName || 'Agent';
     const companyName = data.companyName || agentName;
 
