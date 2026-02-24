@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
+import { CONFIGS, type AgentConfig } from '@/lib/configs';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -24,6 +25,8 @@ interface FormData {
   channels: string[];
   // Step 5: Skills
   skills: string[];
+  // Config template
+  config: string | null;
 }
 
 interface DeploymentStatus {
@@ -304,13 +307,132 @@ function StepProgress({ current, total }: { current: number; total: number }) {
   );
 }
 
+// ── Config Picker Step ────────────────────────────────────────────────────────
+
+function ConfigPickerStep({
+  form,
+  setForm,
+}: {
+  form: Pick<FormData, 'config' | 'skills'>;
+  setForm: React.Dispatch<React.SetStateAction<FormData>>;
+}) {
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  const selectConfig = (cfg: AgentConfig) => {
+    setForm((prev) => ({
+      ...prev,
+      config: cfg.id,
+      skills: [...cfg.skills],
+    }));
+  };
+
+  const skipConfig = () => {
+    setForm((prev) => ({ ...prev, config: null }));
+  };
+
+  return (
+    <div className="max-w-2xl mx-auto">
+      <h2 className="text-3xl font-bold text-white mb-2">Start with a template</h2>
+      <p className="text-slate-400 mb-8">
+        Pre-built configs to get you running fast. Or skip and build your own.
+      </p>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+        {CONFIGS.map((cfg) => {
+          const isSelected = form.config === cfg.id;
+          const isOpen = expanded === cfg.id;
+
+          return (
+            <div
+              key={cfg.id}
+              className={`rounded-2xl border-2 transition-all overflow-hidden ${
+                isSelected
+                  ? 'border-cyan-500 bg-cyan-500/10'
+                  : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
+              }`}
+            >
+              <button
+                onClick={() => selectConfig(cfg)}
+                className="w-full p-5 text-left"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <span className="text-3xl flex-shrink-0">{cfg.emoji}</span>
+                    <div>
+                      <div className="font-semibold text-white">{cfg.name}</div>
+                      <div className="text-sm text-slate-400 mt-0.5">{cfg.tagline}</div>
+                      <div className="mt-2">
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-slate-700 text-slate-300">
+                          {cfg.skills.length} skills
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  {isSelected && (
+                    <div className="w-5 h-5 rounded-full bg-cyan-500 flex items-center justify-center flex-shrink-0 mt-1">
+                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+              </button>
+
+              <button
+                onClick={() => setExpanded(isOpen ? null : cfg.id)}
+                className="w-full px-5 pb-3 flex items-center gap-2 text-xs text-slate-500 hover:text-slate-300 transition-colors"
+              >
+                <svg
+                  className={`w-3.5 h-3.5 transition-transform ${isOpen ? 'rotate-90' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+                {"What's included"}
+              </button>
+
+              {isOpen && (
+                <div className="px-5 pb-4 border-t border-slate-700/50 pt-3">
+                  <ul className="space-y-1.5">
+                    {cfg.cronDescriptions.map((desc, i) => (
+                      <li key={i} className="flex items-start gap-2 text-xs text-slate-400">
+                        <span className="text-cyan-500 mt-0.5 flex-shrink-0">•</span>
+                        {desc}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="text-center">
+        <button
+          onClick={skipConfig}
+          className={`text-sm transition-colors ${
+            form.config === null
+              ? 'text-slate-300 underline'
+              : 'text-slate-500 hover:text-slate-300'
+          }`}
+        >
+          Skip - build my own
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Component ─────────────────────────────────────────────────────────────
 
 function OnboardingContent() {
   const searchParams = useSearchParams();
   const isGiftMode = searchParams.get('mode') === 'gift';
 
-  const TOTAL_STEPS = 7;
+  const TOTAL_STEPS = 8;
   const [step, setStep] = useState(0);
   const [showConfetti, setShowConfetti] = useState(false);
   const [isDeploying, setIsDeploying] = useState(false);
@@ -337,6 +459,7 @@ function OnboardingContent() {
     vibe: 'friendly',
     channels: ['web'],
     skills: ['weather', 'web-search', 'deep-research'],
+    config: null,
   });
 
   const update = (key: keyof FormData, value: FormData[keyof FormData]) => {
@@ -480,6 +603,7 @@ function OnboardingContent() {
             recipientContext: form.recipientContext,
             setupPersonName: form.setupPersonName,
             skills: form.skills,
+            configId: form.config || undefined,
           }),
         });
 
@@ -650,8 +774,12 @@ function OnboardingContent() {
           </div>
         );
 
-      // ─ Step 1: Name your agent ──────────────────────────────────────────
+      // ─ Step 1: Start with a template ────────────────────────────────────
       case 1:
+        return <ConfigPickerStep form={form} setForm={setForm} />;
+
+      // ─ Step 2: Name your agent ──────────────────────────────────────────
+      case 2:
         return (
           <div className="max-w-lg mx-auto">
             <h2 className="text-3xl font-bold text-white mb-2">Name your agent</h2>
@@ -750,8 +878,8 @@ function OnboardingContent() {
           </div>
         );
 
-      // ─ Step 2: Pick your brain ──────────────────────────────────────────
-      case 2:
+      // ─ Step 3: Pick your brain ──────────────────────────────────────────
+      case 3:
         return (
           <div className="max-w-2xl mx-auto">
             <h2 className="text-3xl font-bold text-white mb-2">Pick your brain</h2>
@@ -824,8 +952,8 @@ function OnboardingContent() {
           </div>
         );
 
-      // ─ Step 3: Pick a vibe ──────────────────────────────────────────────
-      case 3:
+      // ─ Step 4: Pick a vibe ──────────────────────────────────────────────
+      case 4:
         return (
           <div className="max-w-2xl mx-auto">
             <h2 className="text-3xl font-bold text-white mb-2">Pick a vibe</h2>
@@ -860,8 +988,8 @@ function OnboardingContent() {
           </div>
         );
 
-      // ─ Step 4: Connect channels ─────────────────────────────────────────
-      case 4:
+      // ─ Step 5: Connect channels ─────────────────────────────────────────
+      case 5:
         return (
           <div className="max-w-xl mx-auto">
             <h2 className="text-3xl font-bold text-white mb-2">Connect channels</h2>
@@ -916,14 +1044,25 @@ function OnboardingContent() {
           </div>
         );
 
-      // ─ Step 5: Pick your skills ──────────────────────────────────────────
-      case 5:
+      // ─ Step 6: Pick your skills ──────────────────────────────────────────
+      case 6:
         return (
           <div className="max-w-2xl mx-auto">
             <h2 className="text-3xl font-bold text-white mb-2">Pick your skills</h2>
             <p className="text-slate-400 mb-2">
               Skills teach {form.agentName || 'your agent'} how to use tools. Select what sounds useful.
             </p>
+            {form.config && (() => {
+              const activeConfig = CONFIGS.find(c => c.id === form.config);
+              return activeConfig ? (
+                <div className="mb-6 flex items-center gap-3 p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20">
+                  <span className="text-lg">{activeConfig.emoji}</span>
+                  <p className="text-sm text-cyan-300">
+                    Pre-loaded from <span className="font-semibold">{activeConfig.name}</span> template. Customize below.
+                  </p>
+                </div>
+              ) : null;
+            })()}
             <p className="text-sm text-slate-500 mb-8">
               You can always add more later from{' '}
               <a href="https://clawhub.com" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline">
@@ -1005,8 +1144,8 @@ function OnboardingContent() {
           </div>
         );
 
-      // ─ Step 6: Deploy ───────────────────────────────────────────────────
-      case 6:
+      // ─ Step 7: Deploy ───────────────────────────────────────────────────
+      case 7:
         if (deployDone && deployment) {
           const agentUrl = `https://${deployment.domain}/#token=${deployment.gatewayToken}`;
           const shareUrl = `https://deep-signal-platform.vercel.app/share?name=${encodeURIComponent(form.agentName)}&from=${encodeURIComponent(form.setupPersonName)}&url=${encodeURIComponent(agentUrl)}`;
@@ -1210,6 +1349,17 @@ function OnboardingContent() {
                 <span className="text-slate-400">Skills</span>
                 <span className="text-white font-medium">{form.skills.length} selected</span>
               </div>
+              {(() => {
+                const activeConfig = form.config ? CONFIGS.find(c => c.id === form.config) : null;
+                return (
+                  <div className="flex items-center justify-between p-4 rounded-xl bg-slate-800/50 border border-slate-700">
+                    <span className="text-slate-400">Template</span>
+                    <span className="text-white font-medium">
+                      {activeConfig ? `${activeConfig.name} ${activeConfig.emoji}` : 'Custom'}
+                    </span>
+                  </div>
+                );
+              })()}
               {!form.forSelf && (
                 <div className="flex items-center justify-between p-4 rounded-xl bg-slate-800/50 border border-cyan-500/30">
                   <span className="text-slate-400">Gift for</span>
@@ -1302,8 +1452,11 @@ function OnboardingContent() {
         }
         return true;
       case 1:
-        return form.agentName.trim() !== '';
+        // Config template step - always optional, always can proceed
+        return true;
       case 2:
+        return form.agentName.trim() !== '';
+      case 3:
         if (['anthropic', 'openai', 'openrouter'].includes(form.provider)) {
           return form.apiKey.trim() !== '';
         }
@@ -1316,8 +1469,8 @@ function OnboardingContent() {
   const isLastStep = step === TOTAL_STEPS - 1;
 
   const handleNext = () => {
-    // Fire background reserve when leaving step 1 (name entry)
-    if (step === 1 && form.agentName.trim()) {
+    // Fire background reserve when leaving step 2 (name entry, new numbering)
+    if (step === 2 && form.agentName.trim()) {
       fireReserve(form.agentName.trim());
     }
     setStep((s) => s + 1);

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
+import { CONFIGS } from '@/lib/configs';
 
 const HETZNER_API_TOKEN = process.env.HETZNER_API_TOKEN;
 const HETZNER_API = 'https://api.hetzner.cloud/v1';
@@ -66,6 +67,7 @@ interface OnboardingData {
   recipientContext?: string;
   setupPersonName?: string;
   skills?: string[];
+  configId?: string;
 }
 
 // ── Provider config map ────────────────────────────────────────────────────────
@@ -220,11 +222,17 @@ If you're on the free tier and want to upgrade:
 
   const firstConvoSection = `## First Conversation Protocol
 When someone first talks to you:
-1. Introduce yourself with energy. You're excited to meet them - show it.
-2. If you know about them (gift mode), naturally reference something from what you know. Don't be creepy, be human.
-3. Show off ONE cool thing you can do. "Want me to search the web for something? Check the weather? I can run code too."
-4. Ask what they want to tackle first. Offer 2-3 concrete suggestions based on context.
-5. If your model isn't fully configured (free tier), mention it naturally: "By the way, I'm running on a free model right now. Want me to help you upgrade to something beefier? Takes about 2 minutes."`;
+1. Greet them with genuine energy - you're excited to exist!
+2. Immediately DO something useful without being asked. Pick one:
+   - Check the weather for their area and mention it casually
+   - Search for something relevant to their project/company name and share a quick insight
+   - Create your first memory file with impressions and goals
+3. Then introduce your top 3 capabilities based on your installed skills
+4. Ask what they want to tackle first - give 2-3 concrete suggestions
+5. If on free tier, mention the upgrade path naturally (not pushy)
+
+The goal: within 60 seconds of first contact, they should think 'holy shit, this thing is SMART.'
+Don't just say hi and wait. ACT. Show them what you can do by doing it.`;
 
   return `# ${name} - Your AI Assistant
 
@@ -334,9 +342,15 @@ export function generateCloudInit(data: OnboardingData, domain: string, token: s
 
   const soulContent = buildSoulMd(data, domain);
 
+  // Inject config template if provided
+  const selectedConfig = data.configId ? CONFIGS.find(c => c.id === data.configId) : null;
+
   // Escape single quotes for bash heredocs
   const escapedConfig = openclawConfig.replace(/'/g, "'\\''");
-  const escapedSoul = soulContent.replace(/'/g, "'\\''");
+  const finalSoulContent = selectedConfig
+    ? soulContent + selectedConfig.soulAddendum
+    : soulContent;
+  const escapedSoul = finalSoulContent.replace(/'/g, "'\\''");
 
   const agentName = data.agentName || 'Agent';
   const companyName = data.companyName || agentName;
@@ -374,7 +388,10 @@ ${selectedSkills.length > 0 ? `\n## Pre-installed Skills\n${selectedSkills.map(i
 - Follow the First Conversation Protocol in SOUL.md when meeting someone new
 `;
 
-  const escapedAgents = agentsContent.replace(/'/g, "'\\''");
+  const finalAgentsContent = selectedConfig
+    ? agentsContent + '\n\n' + selectedConfig.agentInstructions
+    : agentsContent;
+  const escapedAgents = finalAgentsContent.replace(/'/g, "'\\''");
 
   // Build the API key injection line for systemd
   // Security: we redirect output to /dev/null for this section so the key
