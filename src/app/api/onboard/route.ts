@@ -45,8 +45,8 @@ interface OnboardingData {
 function generateCloudInit(data: OnboardingData, domain: string, token: string): string {
   const modelMap: Record<string, string> = {
     haiku: 'anthropic/claude-haiku-3-5',
-    sonnet: 'anthropic/claude-sonnet-4',
-    opus: 'anthropic/claude-opus-4',
+    sonnet: 'anthropic/claude-sonnet-4-6',
+    opus: 'anthropic/claude-opus-4-6',
   };
   const modelId = modelMap[data.model] || 'anthropic/claude-haiku-3-5';
   
