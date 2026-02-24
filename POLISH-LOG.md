@@ -1,4 +1,21 @@
 
+## 2026-02-24 18:00 - Capacity Waitlist Flow
+
+**What:** When Hetzner quota is hit and server creation fails, users now see a friendly amber "We're at capacity" UI instead of a generic red error. They get an email input + "Notify me" CTA. On submit, it fires `/api/waitlist` which sends Jake an email via Resend with the signup details (email, agent name, timestamp). Success state: "You're on the list! We'll email you when a slot opens."
+
+**Why:** The conversion cliff. Every time the Hetzner quota is hit, users who complete the full 8-step wizard bounce on an opaque error. That's a warm lead lost with zero capture. Now it's a lead capture moment instead of a dead end.
+
+**Details:**
+- Backend: `/api/onboard/route.ts` and `/api/onboard/reserve/route.ts` now detect Hetzner quota errors by error code (`resource_limit_exceeded`, `servers_limit_reached`, `project_limit_reached`) and regex pattern matching
+- Both return `{ code: 'SERVER_CAPACITY' }` with HTTP 503 when capacity is hit
+- Frontend: `isCapacityError` state detected in deploy handler, shows amber waitlist UI
+- Waitlist UI: amber color palette (warning, not failure), email input, "Notify me" CTA, "Try again anyway" escape hatch
+- Success state shows submitted email address for confirmation
+- `/api/waitlist/route.ts` new endpoint - validates email, sends Resend notification to Jake
+- RESEND_API_KEY added to Vercel production env
+
+**Commit:** c9a5166
+
 ## 2026-02-24 07:00 - Save Credentials + Token Security Fix
 
 **What:** Added "Save credentials" button on the success page. Downloads a `.txt` file with agent name, domain, IP, gateway token, and reconnect instructions. Also fixed a security issue where the "Share on X" button was embedding the gateway token in the public tweet URL.
