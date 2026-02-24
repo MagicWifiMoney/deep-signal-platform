@@ -415,7 +415,7 @@ export default function Onboarding() {
             <p className="text-xl text-slate-400 mb-8">
               Deploy your dedicated AI agent in under 5 minutes.
             </p>
-            <div className="grid grid-cols-3 gap-6 text-left mb-8">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 text-left mb-8">
               {[
                 { title: 'Private Instance', text: 'Your own isolated server' },
                 { title: 'Zero-Knowledge', text: 'We never see your data' },
@@ -443,25 +443,25 @@ export default function Onboarding() {
                   type="text"
                   value={formData.companyName}
                   onChange={(e) => updateForm('companyName', e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-slate-800/50 border border-slate-700 text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none transition-colors"
+                  className="w-full px-4 py-3 rounded-xl bg-slate-800/50 border border-slate-700 text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none transition-colors text-base"
                   placeholder="Acme Corp"
                 />
               </div>
               
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">Company Website</label>
-                <div className="flex gap-3">
+                <div className="flex flex-col sm:flex-row gap-3">
                   <input
                     type="url"
                     value={formData.companyUrl}
                     onChange={(e) => updateForm('companyUrl', e.target.value)}
-                    className="flex-1 px-4 py-3 rounded-xl bg-slate-800/50 border border-slate-700 text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none transition-colors"
+                    className="flex-1 px-4 py-3 rounded-xl bg-slate-800/50 border border-slate-700 text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none transition-colors text-base"
                     placeholder="https://acme.com"
                   />
                   <button
                     onClick={analyzeCompany}
                     disabled={!formData.companyUrl || isAnalyzing}
-                    className="px-6 py-3 rounded-xl bg-cyan-600 text-white font-medium hover:bg-cyan-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-w-[120px]"
+                    className="px-6 py-3 rounded-xl bg-cyan-600 text-white font-medium hover:bg-cyan-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed sm:min-w-[120px] min-h-[44px]"
                   >
                     {isAnalyzing ? 'Analyzing...' : 'Analyze'}
                   </button>
@@ -525,7 +525,7 @@ export default function Onboarding() {
             <p className="text-slate-400 mb-8">Your keys are encrypted and stored only on your private instance.</p>
             
             <div className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <button
                   onClick={() => updateForm('apiProvider', 'anthropic')}
                   className={`p-6 rounded-xl border-2 transition-all ${
@@ -568,7 +568,7 @@ export default function Onboarding() {
                   type="password"
                   value={formData.apiKey}
                   onChange={(e) => updateForm('apiKey', e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-slate-800/50 border border-slate-700 text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none transition-colors font-mono"
+                  className="w-full px-4 py-3 rounded-xl bg-slate-800/50 border border-slate-700 text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none transition-colors font-mono text-base"
                   placeholder={formData.apiProvider === 'anthropic' ? 'sk-ant-...' : 'sk-or-v1-...'}
                 />
                 <p className="text-xs text-slate-500 mt-2">
@@ -621,18 +621,18 @@ export default function Onboarding() {
                       {model.cost}
                     </span>
                   </div>
-                  <div className="grid grid-cols-3 gap-4 text-sm">
+                  <div className="grid grid-cols-3 gap-2 text-sm">
                     <div>
                       <span className="text-slate-500 text-xs">Speed</span>
-                      <div className="text-cyan-400">{model.speed}</div>
+                      <div className="text-cyan-400 text-sm">{model.speed}</div>
                     </div>
                     <div>
                       <span className="text-slate-500 text-xs">Latency</span>
-                      <div className="text-white">{model.latency}</div>
+                      <div className="text-white text-sm">{model.latency}</div>
                     </div>
                     <div>
                       <span className="text-slate-500 text-xs">Context</span>
-                      <div className="text-white">{model.context}</div>
+                      <div className="text-white text-sm">{model.context}</div>
                     </div>
                   </div>
                   <p className="text-sm text-slate-400 mt-3">{model.desc}</p>
@@ -710,7 +710,7 @@ export default function Onboarding() {
                         <p className="text-sm text-slate-400">{channel.desc}</p>
                       </div>
                     </div>
-                    <div className="text-xs text-slate-500">{channel.setup}</div>
+                    <div className="hidden sm:block text-xs text-slate-500 text-right max-w-[140px]">{channel.setup}</div>
                   </div>
                 </button>
               ))}
@@ -737,7 +737,7 @@ export default function Onboarding() {
                   type="text"
                   value={formData.agentName}
                   onChange={(e) => updateForm('agentName', e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-slate-800/50 border border-slate-700 text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none transition-colors"
+                  className="w-full px-4 py-3 rounded-xl bg-slate-800/50 border border-slate-700 text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none transition-colors text-base"
                   placeholder="e.g., Alex, Maya, Aria..."
                 />
               </div>
@@ -821,38 +821,38 @@ export default function Onboarding() {
                       <h3 className="font-semibold text-white">Instance Configuration</h3>
                     </div>
                     <div className="p-6 space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                           <div className="text-xs text-slate-500 mb-1">Server Type</div>
-                          <div className="text-white font-mono">Hetzner CPX21</div>
+                          <div className="text-white font-mono text-sm">Hetzner CPX21</div>
                         </div>
                         <div>
                           <div className="text-xs text-slate-500 mb-1">Location</div>
-                          <div className="text-white font-mono">US East (Ashburn)</div>
+                          <div className="text-white font-mono text-sm">US East (Ashburn)</div>
                         </div>
                         <div>
                           <div className="text-xs text-slate-500 mb-1">vCPU</div>
-                          <div className="text-white font-mono">3 cores (AMD EPYC)</div>
+                          <div className="text-white font-mono text-sm">3 cores (AMD EPYC)</div>
                         </div>
                         <div>
                           <div className="text-xs text-slate-500 mb-1">Memory</div>
-                          <div className="text-white font-mono">4 GB DDR4</div>
+                          <div className="text-white font-mono text-sm">4 GB DDR4</div>
                         </div>
                         <div>
                           <div className="text-xs text-slate-500 mb-1">Storage</div>
-                          <div className="text-white font-mono">80 GB NVMe SSD</div>
+                          <div className="text-white font-mono text-sm">80 GB NVMe SSD</div>
                         </div>
                         <div>
                           <div className="text-xs text-slate-500 mb-1">Network</div>
-                          <div className="text-white font-mono">20 TB/mo included</div>
+                          <div className="text-white font-mono text-sm">20 TB/mo included</div>
                         </div>
                         <div>
                           <div className="text-xs text-slate-500 mb-1">OS</div>
-                          <div className="text-white font-mono">Ubuntu 24.04 LTS</div>
+                          <div className="text-white font-mono text-sm">Ubuntu 24.04 LTS</div>
                         </div>
                         <div>
                           <div className="text-xs text-slate-500 mb-1">Monthly Cost</div>
-                          <div className="text-emerald-400 font-mono">$10.59/mo + API usage</div>
+                          <div className="text-emerald-400 font-mono text-sm">$10.59/mo + API usage</div>
                         </div>
                       </div>
                     </div>
@@ -1217,7 +1217,7 @@ export default function Onboarding() {
       </header>
 
       {/* Content */}
-      <main className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)] px-6 py-12">
+      <main className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)] px-6 py-12 pb-28">
         {renderStep()}
       </main>
 
@@ -1228,7 +1228,7 @@ export default function Onboarding() {
             {currentStep > 0 && STEPS[currentStep].id !== 'deploy' ? (
               <button
                 onClick={prevStep}
-                className="px-6 py-3 rounded-xl bg-slate-800/50 border border-slate-700 text-white font-medium hover:bg-slate-800 transition-colors"
+                className="px-6 py-3 min-h-[44px] rounded-xl bg-slate-800/50 border border-slate-700 text-white font-medium hover:bg-slate-800 transition-colors"
               >
                 Back
               </button>
@@ -1240,7 +1240,7 @@ export default function Onboarding() {
               <button
                 onClick={nextStep}
                 disabled={!canProceed()}
-                className="px-6 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-6 py-3 min-h-[44px] rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Continue
               </button>

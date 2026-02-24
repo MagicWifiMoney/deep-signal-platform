@@ -80,7 +80,7 @@ function WelcomeStep({ params, onNext }: { params: WizardParams; onNext: () => v
       </p>
       <p className="text-sm text-slate-500 font-mono mb-10">{params.domain}</p>
 
-      <div className="grid grid-cols-3 gap-4 text-left mb-10">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-left mb-10">
         {[
           { icon: '🔒', title: 'Private Instance', text: 'Dedicated VPS, your data stays yours' },
           { icon: '⚡', title: 'Ready Now', text: 'Agent is live and accepting connections' },
@@ -253,7 +253,7 @@ function ChannelsStep({
                     value={slackToken}
                     onChange={(e) => setSlackToken(e.target.value)}
                     placeholder="xoxb-..."
-                    className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-600 text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none transition-colors font-mono text-sm"
+                    className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-600 text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none transition-colors font-mono text-base"
                   />
                 </div>
 
@@ -333,7 +333,7 @@ function ChannelsStep({
                     value={telegramToken}
                     onChange={(e) => setTelegramToken(e.target.value)}
                     placeholder="123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
-                    className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-600 text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none transition-colors font-mono text-sm"
+                    className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-600 text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none transition-colors font-mono text-base"
                   />
                 </div>
 
@@ -386,7 +386,7 @@ function ChannelsStep({
                 </span>
               )}
             </div>
-            <div className="p-3 rounded-lg bg-slate-900 border border-slate-700 font-mono text-xs text-slate-300 mb-3 overflow-x-auto">
+            <div className="p-3 rounded-lg bg-slate-900 border border-slate-700 font-mono text-xs text-slate-300 mb-3 overflow-x-auto break-all">
               {embedCode}
             </div>
             <button
@@ -577,7 +577,7 @@ function TestStep({ params, onNext }: { params: WizardParams; onNext: () => void
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Type a message..."
-            className="flex-1 px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-600 text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none transition-colors text-sm"
+            className="flex-1 px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-600 text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none transition-colors text-base"
           />
           <button
             onClick={sendMessage}
@@ -857,12 +857,16 @@ function WizardContent() {
       </header>
 
       {/* Step labels */}
-      <div className="flex justify-center gap-8 mb-2">
+      <div className="hidden sm:flex justify-center gap-8 mb-2">
         {STEPS.map((s, i) => (
           <span key={s.id} className={`text-xs ${i === step ? 'text-cyan-400' : 'text-slate-600'}`}>
             {s.label}
           </span>
         ))}
+      </div>
+      {/* Mobile step indicator */}
+      <div className="sm:hidden text-center mb-2">
+        <span className="text-xs text-slate-400">Step {step + 1} of {STEPS.length} - <span className="text-cyan-400">{STEPS[step].label}</span></span>
       </div>
 
       {/* Main content */}

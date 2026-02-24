@@ -114,7 +114,7 @@ export default function Home() {
               mode="onboarding"
               agentUrl={AGENT_URL}
               agentToken={AGENT_TOKEN}
-              className="w-full min-h-[520px]"
+              className="w-full min-h-[60vh] sm:min-h-[520px]"
             />
           </div>
 
