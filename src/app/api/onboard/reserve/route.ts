@@ -142,7 +142,18 @@ apt-get update
 apt-get install -y caddy
 
 echo "[DS] Installing OpenClaw..."
-npm install -g openclaw
+for attempt in 1 2 3; do
+  if npm install -g openclaw 2>&1; then
+    echo "[DS] OpenClaw installed on attempt $attempt"
+    break
+  fi
+  echo "[DS] npm install failed (attempt $attempt/3), retrying in 10s..."
+  sleep 10
+done
+if ! which openclaw > /dev/null 2>&1; then
+  echo "[DS] FATAL: OpenClaw failed to install after 3 attempts"
+  exit 1
+fi
 
 echo "[DS] Creating OpenClaw config..."
 mkdir -p /root/.openclaw/agents/main/agent
