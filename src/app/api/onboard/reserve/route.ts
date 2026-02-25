@@ -78,6 +78,7 @@ function buildDefaultCloudInit(agentName: string, domain: string, token: string)
         dangerouslyAllowHostHeaderOriginFallback: true,
         dangerouslyDisableDeviceAuth: true,
         allowInsecureAuth: true,
+        allowedOrigins: ['https://deep-signal-platform.vercel.app', 'https://deepsignal.ai'],
       },
       trustedProxies: ['127.0.0.1', '::1'],
     },

@@ -356,6 +356,7 @@ export function generateCloudInit(data: OnboardingData, domain: string, token: s
         dangerouslyAllowHostHeaderOriginFallback: true,
         dangerouslyDisableDeviceAuth: true,
         allowInsecureAuth: true,
+        allowedOrigins: ['https://deep-signal-platform.vercel.app', 'https://deepsignal.ai'],
       },
       trustedProxies: ['127.0.0.1', '::1'],
     },

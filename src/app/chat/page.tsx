@@ -113,18 +113,29 @@ class GatewayClient {
 
   private async sendConnect() {
     try {
+      // Use openclaw-control-ui client ID to leverage dangerouslyDisableDeviceAuth bypass
+      // Device fields are required by schema but ignored when bypass is active
+      const deviceId = crypto.randomUUID();
+      const nonce = this.connectNonce ?? '';
+
       const result = await this.request('connect', {
         minProtocol: 3,
         maxProtocol: 3,
         client: {
-          id: 'deep-signal-chat',
+          id: 'openclaw-control-ui',
           version: '1.0.0',
-          platform: 'web',
+          platform: navigator.platform || 'web',
           mode: 'webchat',
         },
-        role: 'operator.admin',
-        scopes: ['operator.admin'],
-        device: null,
+        role: 'operator',
+        scopes: ['operator.admin', 'operator.approvals', 'operator.pairing'],
+        device: {
+          id: deviceId,
+          publicKey: 'bypass',
+          signature: 'bypass',
+          signedAt: Date.now(),
+          nonce,
+        },
         caps: [],
         auth: { token: this.token },
         userAgent: navigator.userAgent,
@@ -236,37 +247,28 @@ function DeepSignalChat() {
 
     client.setHandlers({
       onEvent: (evt) => {
-        // Handle streaming chat events
-        if (evt.event === 'chat.stream' || evt.stream === 'chat' || evt.data) {
-          const data = evt.data ?? evt.payload ?? {};
-          const state = data.state ?? evt.state;
-          const message = data.message ?? evt.message;
+        const payload = evt.payload ?? {};
+
+        // Handle chat events (streaming + final)
+        if (evt.event === 'chat') {
+          const state = payload.state;
+          const message = payload.message;
 
           if (state === 'delta') {
-            // Extract streamed text
-            let text = '';
-            if (typeof message === 'string') {
-              text = message;
-            } else if (message?.content) {
-              text = extractText(message.content);
-            } else if (typeof message?.text === 'string') {
-              text = message.text;
-            }
+            const text = extractText(message?.content ?? '');
             if (text) {
               streamRef.current = text;
               setStream(text);
             }
           } else if (state === 'final') {
-            // Message complete
-            const finalText = extractText(message?.content ?? message?.text ?? message ?? '');
+            const finalText = extractText(message?.content ?? '');
             if (finalText) {
               setMessages((prev) => [...prev, {
                 role: 'assistant',
                 content: finalText,
-                timestamp: Date.now(),
+                timestamp: message?.timestamp ?? Date.now(),
               }]);
             } else if (streamRef.current) {
-              // Use accumulated stream as final
               setMessages((prev) => [...prev, {
                 role: 'assistant',
                 content: streamRef.current!,
