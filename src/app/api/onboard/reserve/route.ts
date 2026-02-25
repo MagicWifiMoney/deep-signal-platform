@@ -66,9 +66,10 @@ async function createDnsRecord(subdomain: string, ip: string): Promise<void> {
 }
 
 function buildDefaultCloudInit(agentName: string, domain: string, token: string): string {
-  const anthropicKey = process.env.ANTHROPIC_API_KEY || '';
+  // Default boot config uses Kilo Gateway free tier - no user API key required
+  const kilocodeKey = process.env.KILOCODE_API_KEY || '';
   const openclawConfig = JSON.stringify({
-    agents: { defaults: { model: { primary: 'anthropic/claude-sonnet-4-6' } } },
+    agents: { defaults: { model: { primary: 'kilocode/z-ai/glm-5:free' } } },
     gateway: {
       mode: 'local',
       bind: 'lan',
@@ -82,7 +83,7 @@ function buildDefaultCloudInit(agentName: string, domain: string, token: string)
       },
       trustedProxies: ['127.0.0.1', '::1'],
     },
-    env: anthropicKey ? { ANTHROPIC_API_KEY: anthropicKey } : {},
+    env: kilocodeKey ? { KILOCODE_API_KEY: kilocodeKey } : {},
     skills: {
       entries: {
         weather: { enabled: true },

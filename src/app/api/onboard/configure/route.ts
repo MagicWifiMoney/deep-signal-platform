@@ -15,14 +15,17 @@ const DS_CONFIG_URL = 'https://dsconfig.jgiebz.com';
 const DS_CONFIG_AUTH = 'Bearer ds-config-secret-2026';
 
 const PROVIDER_MODELS: Record<string, string> = {
-  free: 'kilocode/minimax/MiniMax-M2.5',
+  // Free/Later: Kilo Gateway GLM-5 free model — no user API key required
+  free: 'kilocode/z-ai/glm-5:free',
   anthropic: 'anthropic/claude-sonnet-4-6',
   openai: 'openai/gpt-4o',
   openrouter: 'openrouter/anthropic/claude-sonnet-4-5',
-  later: 'kilocode/minimax/MiniMax-M2.5',
+  later: 'kilocode/z-ai/glm-5:free',
 };
 
 const PROVIDER_ENV_KEYS: Record<string, string> = {
+  free: 'KILOCODE_API_KEY',
+  later: 'KILOCODE_API_KEY',
   anthropic: 'ANTHROPIC_API_KEY',
   openai: 'OPENAI_API_KEY',
   openrouter: 'OPENROUTER_API_KEY',

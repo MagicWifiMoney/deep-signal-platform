@@ -102,9 +102,9 @@ const PROVIDERS = [
   {
     id: 'free',
     emoji: '🆓',
-    name: 'Start Free',
-    subtitle: 'Kilo Gateway (GLM-5 / MiniMax M2.5)',
-    description: 'Perfect for trying things out. No API key needed.',
+    name: 'Start for Free',
+    subtitle: 'Powered by Kilo Gateway — no API key needed',
+    description: 'Free AI models included. Using GLM-5 and MiniMax M2.5 (free tier). Upgrade anytime.',
     price: 'Free',
     priceColor: 'text-emerald-400',
     needsKey: false,

@@ -72,9 +72,11 @@ interface OnboardingData {
 
 // ── Provider config map ────────────────────────────────────────────────────────
 const providerConfigs = {
+  // Free tier: Kilo Gateway — GLM-5 free model, no user API key required.
+  // Deep Signal injects its own KILOCODE_API_KEY server-side.
   free: {
-    model: 'anthropic/claude-sonnet-4-6',
-    env: 'ANTHROPIC_API_KEY',
+    model: 'kilocode/z-ai/glm-5:free',
+    env: 'KILOCODE_API_KEY',
     providers: {},
   },
   anthropic: {
@@ -92,9 +94,10 @@ const providerConfigs = {
     env: 'OPENROUTER_API_KEY',
     providers: {},
   },
+  // Configure Later: also start on Kilo free tier
   later: {
-    model: 'anthropic/claude-sonnet-4-6',
-    env: 'ANTHROPIC_API_KEY',
+    model: 'kilocode/z-ai/glm-5:free',
+    env: 'KILOCODE_API_KEY',
     providers: {},
   },
 };
@@ -328,7 +331,9 @@ export function generateCloudInit(data: OnboardingData, domain: string, token: s
   }
 
   // Determine the effective API key for config injection
-  const effectiveApiKeyForConfig = data.apiKey || (provider === 'free' || provider === 'later' ? process.env.ANTHROPIC_API_KEY || '' : '');
+  // Free/Later: use platform-provided Kilo Gateway key (no user key needed)
+  // Paid tiers: use the user-provided API key
+  const effectiveApiKeyForConfig = data.apiKey || (provider === 'free' || provider === 'later' ? process.env.KILOCODE_API_KEY || '' : '');
 
   // Build env object for openclaw.json
   const envConfig: Record<string, string> = {};
@@ -384,8 +389,8 @@ export function generateCloudInit(data: OnboardingData, domain: string, token: s
   const agentName = data.agentName || 'Agent';
   const companyName = data.companyName || agentName;
 
-  // API key: use user-provided key, or server-side Gemini key for free tier
-  const effectiveApiKey = data.apiKey || (provider === 'free' || provider === 'later' ? process.env.ANTHROPIC_API_KEY || '' : '');
+  // API key: use user-provided key, or platform Kilo key for free tier
+  const effectiveApiKey = data.apiKey || (provider === 'free' || provider === 'later' ? process.env.KILOCODE_API_KEY || '' : '');
 
   // API key environment line (only if we have one)
   // NOTE: kept only in systemd service file - NOT written to the log
